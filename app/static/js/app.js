@@ -53,12 +53,21 @@ document.addEventListener('alpine:init', () => {
         calendarCategories: [],
         selectedEvent: null, // read-only detail panel
         eventFormOpen: false,
-        eventForm: { title: '', description: '', start_time: '', end_time: '', is_all_day: false, category: 'other' },
+        eventForm: { title: '', description: '', start_time: '', end_time: '', is_all_day: false, category: 'other', rrule: '' },
         editingEventId: null,
         miniCalendarDate: new Date(),
         calendarFilter: 'all', // category filter
         calendarLoading: false,
         _calendarReq: 0,
+        recurrencePresets: [
+            { label: 'None', value: '' },
+            { label: 'Daily', value: 'FREQ=DAILY;COUNT=30' },
+            { label: 'Weekdays', value: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;COUNT=60' },
+            { label: 'Weekly', value: 'FREQ=WEEKLY;COUNT=52' },
+            { label: 'Bi-weekly', value: 'FREQ=WEEKLY;INTERVAL=2;COUNT=26' },
+            { label: 'Monthly', value: 'FREQ=MONTHLY;COUNT=12' },
+            { label: 'Yearly', value: 'FREQ=YEARLY;COUNT=5' },
+        ],
 
         // --- AI State ---
         aiPanelOpen: false,
@@ -667,7 +676,7 @@ document.addEventListener('alpine:init', () => {
                 title: '', description: '', category: 'other',
                 start_time: this.toLocalDatetime(d),
                 end_time: this.toLocalDatetime(end),
-                is_all_day: false,
+                is_all_day: false, rrule: '',
             };
             this.editingEventId = null;
             this.eventFormOpen = true;
@@ -679,7 +688,7 @@ document.addEventListener('alpine:init', () => {
                 title: evt.title, description: evt.description || '', category: evt.category || 'other',
                 start_time: this.toLocalDatetime(new Date(evt.start_time)),
                 end_time: this.toLocalDatetime(new Date(evt.end_time)),
-                is_all_day: evt.is_all_day,
+                is_all_day: evt.is_all_day, rrule: evt.rrule || '',
             };
             this.editingEventId = evt.id;
             this.eventFormOpen = true;
@@ -709,6 +718,7 @@ document.addEventListener('alpine:init', () => {
                     account_id: this.accounts[0]?.id ?? 1,
                     start_time: new Date(this.eventForm.start_time).toISOString(),
                     end_time: new Date(this.eventForm.end_time).toISOString(),
+                    rrule: this.eventForm.rrule || null,
                 };
                 const url = this.editingEventId
                     ? `/api/calendar/events/${this.editingEventId}`
