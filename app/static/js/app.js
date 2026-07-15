@@ -230,7 +230,8 @@ document.addEventListener('alpine:init', () => {
                 const res = await fetch('/api/seed', { method: 'POST' });
                 if (res.ok) {
                     await this.loadEmails();
-                    alert('Demo data seeded! Check your inbox.');
+                    this.currentFolder = 'INBOX';
+                    this.page = 'inbox';
                 }
             } catch (e) {}
         },

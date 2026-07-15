@@ -20,7 +20,7 @@
                 <p class="text-xs text-gray-400" x-show="health" x-text="'v' + health.version"></p>
             </div>
             <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto">
-                <template x-for="link in sidebarLinks" :key="link.id">
+                <template x-for="link in sidebarLinks.slice(0, 5)" :key="link.id">
                     <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors"
                        :class="page === link.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
                        @click.prevent="navigate(link.id)">
@@ -29,6 +29,18 @@
                     </a>
                 </template>
             </nav>
+            <div class="border-t border-gray-200 pt-2 pb-2 px-2 space-y-0.5">
+                <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors"
+                   :class="page === 'automation' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+                   @click.prevent="navigate('automation')">
+                    <span>⚡</span><span>Automation</span>
+                </a>
+                <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors"
+                   :class="page === 'settings' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+                   @click.prevent="navigate('settings')">
+                    <span>⚙️</span><span>Settings</span>
+                </a>
+            </div>
             <div class="p-3 border-t border-gray-200 flex items-center gap-2 text-xs text-gray-400">
                 <span class="w-2 h-2 rounded-full" :class="health ? 'bg-green-500' : 'bg-red-500'"></span>
                 <span x-text="health ? 'Connected' : 'Disconnected'"></span>
@@ -47,7 +59,8 @@
                     <span x-show="page === 'settings'">Settings</span>
                 </h2>
                 <div class="flex items-center gap-2">
-                    <button @click="aiPanelOpen = !aiPanelOpen" class="px-2.5 py-1.5 border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 flex items-center gap-1">🤖 AI</button>
+                    <button @click="aiPanelOpen = !aiPanelOpen" class="px-2.5 py-1.5 border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 flex items-center gap-1">AI</button>
+                    <button @click="navigate('settings')" class="px-2.5 py-1.5 border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 flex items-center gap-1">Settings</button>
                     <button @click="openCompose()" class="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700" x-show="page !== 'settings' && page !== 'automation' && page !== 'calendar'">+ Compose</button>
                 </div>
             </header>
@@ -60,7 +73,12 @@
                         <div x-show="!loading && page === folderPage" class="flex-1 flex overflow-hidden">
                             <!-- Email list -->
                             <div class="w-full flex flex-col overflow-hidden" :class="{ 'border-r border-gray-200': selectedEmail }">
-                                <div x-show="emails.length === 0" class="flex-1 flex items-center justify-center text-sm text-gray-400">📭 No emails here yet. <button @click="seedData" class="ml-1 text-blue-600 hover:underline">Seed demo data?</button></div>
+                                <div x-show="emails.length === 0" class="flex-1 flex flex-col items-center justify-center text-center p-8">
+                                    <div class="text-5xl mb-4">📭</div>
+                                    <p class="text-base text-gray-500 mb-4">Your inbox is empty</p>
+                                    <p class="text-sm text-gray-400 mb-6">Add demo data to test the app while OAuth is pending.</p>
+                                    <button @click="seedData" class="px-6 py-3 bg-purple-600 text-white text-base rounded-xl hover:bg-purple-700 shadow-sm font-medium">🌱 Seed Demo Data</button>
+                                </div>
                                 <div x-show="emails.length > 0" class="flex-1 overflow-y-auto divide-y divide-gray-50">
                                     <template x-for="email in emails" :key="email.id">
                                         <div @click="selectEmail(email)"
