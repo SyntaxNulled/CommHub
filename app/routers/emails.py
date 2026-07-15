@@ -99,7 +99,7 @@ async def send_email(req: SendEmailRequest, db: AsyncSession = Depends(get_db)):
     import datetime
     email = Email(
         account_id=req.account_id,
-        provider_message_id=f"sent-{datetime.datetime.utcnow().timestamp()}",
+        provider_message_id=f"sent-{datetime.datetime.now(datetime.UTC).timestamp()}",
         from_address=account.email,
         from_name=account.display_name,
         to_addresses=req.to,
@@ -107,7 +107,7 @@ async def send_email(req: SendEmailRequest, db: AsyncSession = Depends(get_db)):
         body_text=req.body,
         is_read=True,
         folder="SENT",
-        received_at=datetime.datetime.utcnow(),
+        received_at=datetime.datetime.now(datetime.UTC),
     )
     db.add(email)
     await db.commit()
@@ -125,7 +125,7 @@ async def save_draft(req: SaveDraftRequest, db: AsyncSession = Depends(get_db)):
 
     email = Email(
         account_id=req.account_id,
-        provider_message_id=f"draft-{datetime.datetime.utcnow().timestamp()}",
+        provider_message_id=f"draft-{datetime.datetime.now(datetime.UTC).timestamp()}",
         from_address=account.email,
         from_name=account.display_name,
         to_addresses=req.to,
@@ -133,7 +133,7 @@ async def save_draft(req: SaveDraftRequest, db: AsyncSession = Depends(get_db)):
         body_text=req.body,
         is_read=True,
         folder="DRAFTS",
-        received_at=datetime.datetime.utcnow(),
+        received_at=datetime.datetime.now(datetime.UTC),
     )
     db.add(email)
     await db.commit()

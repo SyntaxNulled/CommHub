@@ -1,3 +1,4 @@
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
@@ -46,5 +47,9 @@ async def seed_demo_data():
     return await _seed()
 
 
-static_dir = Path(__file__).parent / "static"
+if getattr(sys, "frozen", False):
+    base = Path(sys._MEIPASS)
+    static_dir = base / "app" / "static"
+else:
+    static_dir = Path(__file__).parent / "static"
 app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")

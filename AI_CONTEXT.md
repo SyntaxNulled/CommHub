@@ -100,7 +100,7 @@ AIProviderConfig      — id, provider_type, display_name, api_key, base_url, mo
 
 ### Next up (no particular order)
 - System tray icon (pystray) — minimize to tray, background running
-- Fix 62 `utcnow()` deprecation warnings → `now(datetime.UTC)`
+- Fix all `utcnow()` deprecation warnings → `now(datetime.UTC)`
 - UX polish: search/filter, dark mode, keyboard shortcuts, month calendar view
 - Auto-start on boot option
 - Inno Setup / NSIS installer wrapping `dist/commhub.exe`

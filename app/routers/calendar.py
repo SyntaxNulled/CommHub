@@ -83,7 +83,7 @@ async def create_event(evt: EventCreate, db: AsyncSession = Depends(get_db)):
 
     record = CalendarEvent(
         account_id=evt.account_id,
-        provider_event_id=f"local-{datetime.datetime.utcnow().timestamp()}",
+        provider_event_id=f"local-{datetime.datetime.now(datetime.UTC).timestamp()}",
         title=evt.title, description=evt.description, location=evt.location,
         start_time=start, end_time=end, is_all_day=evt.is_all_day,
     )

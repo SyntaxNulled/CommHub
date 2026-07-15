@@ -5,6 +5,7 @@ __pycache__/
 dist/
 build/
 *.spec
+!commhub.spec
 .venv/
 venv/
 env/
