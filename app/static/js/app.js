@@ -25,6 +25,8 @@ document.addEventListener('alpine:init', () => {
         currentFolder: 'INBOX',
         composeOpen: false,
         composeForm: { account_id: 1, to: '', subject: '', body: '' },
+        searchQuery: '',
+        searchFilter: 'all',
 
         // --- Calendar State ---
         events: [],
@@ -67,6 +69,22 @@ document.addEventListener('alpine:init', () => {
         },
         get accountOptions() {
             return this.accounts.map(a => ({ value: a.id, label: a.email }));
+        },
+        get filteredEmails() {
+            let list = this.emails;
+            if (this.searchFilter === 'unread') list = list.filter(e => !e.is_read);
+            else if (this.searchFilter === 'read') list = list.filter(e => e.is_read);
+            else if (this.searchFilter === 'starred') list = list.filter(e => e.is_starred);
+            if (this.searchQuery.trim()) {
+                const q = this.searchQuery.toLowerCase();
+                list = list.filter(e =>
+                    (e.subject && e.subject.toLowerCase().includes(q)) ||
+                    (e.from_address && e.from_address.toLowerCase().includes(q)) ||
+                    (e.from_name && e.from_name.toLowerCase().includes(q)) ||
+                    (e.body_text && e.body_text.toLowerCase().includes(q))
+                );
+            }
+            return list;
         },
 
         // --- Automation State ---
