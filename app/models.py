@@ -71,6 +71,7 @@ class CalendarEvent(Base):
     start_time: Mapped[datetime.datetime] = mapped_column(DateTime, index=True)
     end_time: Mapped[datetime.datetime] = mapped_column(DateTime)
     is_all_day: Mapped[bool] = mapped_column(Boolean, default=False)
+    category: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=utcnow)
 
     account: Mapped["EmailAccount"] = relationship(back_populates="calendar_events")
@@ -96,7 +97,7 @@ class AIProviderConfig(Base):
     __tablename__ = "ai_provider_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    provider_type: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    provider_type: Mapped[str] = mapped_column(String(64), index=True)
     display_name: Mapped[str] = mapped_column(String(128))
     api_key: Mapped[str] = mapped_column(Text, default="")
     base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
