@@ -1,4 +1,6 @@
 import logging
+import re
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import AutomationRule
@@ -32,8 +34,11 @@ def _matches_trigger(trigger_config: dict, context: dict) -> bool:
             if actual not in expected:
                 return False
         elif isinstance(expected, str) and expected.startswith("re:"):
-            import re
-            if not re.search(expected[3:], str(actual or ""), re.IGNORECASE):
+            try:
+                if not re.search(expected[3:], str(actual or ""), re.IGNORECASE):
+                    return False
+            except re.error:
+                logger.warning(f"Invalid regex in trigger config: {expected[3:]!r} — skipping rule")
                 return False
         else:
             if actual != expected:

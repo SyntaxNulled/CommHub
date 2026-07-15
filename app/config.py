@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     port: int = 8765
     database_url: str = f"sqlite+aiosqlite:///{Path.home() / '.commhub' / 'commhub.db'}"
     data_dir: Path = Path.home() / ".commhub"
-    debug: bool = True
+    debug: bool = False  # set COMMHUB_DEBUG=1 for SQL echo + verbose logs
 
     # OAuth
     google_client_id: str = ""

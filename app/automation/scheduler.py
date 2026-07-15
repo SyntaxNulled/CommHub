@@ -1,5 +1,4 @@
 import logging
-from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.triggers.cron import CronTrigger
@@ -17,7 +16,7 @@ async def start_scheduler():
 
 async def stop_scheduler():
     if scheduler.running:
-        scheduler.shutdown(wait=False)
+        scheduler.shutdown(wait=True)
         logger.info("APScheduler stopped")
 
 

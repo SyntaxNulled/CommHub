@@ -1,5 +1,7 @@
 """System tray icon for CommHub desktop app."""
 
+from __future__ import annotations
+
 import threading
 import webbrowser
 from pathlib import Path

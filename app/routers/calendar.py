@@ -48,6 +48,17 @@ def _event_to_response(e: CalendarEvent) -> EventResponse:
     )
 
 
+def _parse_iso(value: str, field: str) -> datetime.datetime:
+    """Parse ISO datetime and normalize to naive UTC so DB comparisons never mix aware/naive."""
+    try:
+        dt = datetime.datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        raise HTTPException(400, f"Invalid datetime for '{field}'. Use ISO format (e.g. 2026-07-15T14:00:00)")
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(datetime.UTC).replace(tzinfo=None)
+    return dt
+
+
 @router.get("/events", response_model=list[EventResponse])
 async def list_events(
     start: str | None = Query(None),
@@ -57,29 +68,20 @@ async def list_events(
     q = select(CalendarEvent).order_by(CalendarEvent.start_time)
 
     if start:
-        try:
-            start_dt = datetime.datetime.fromisoformat(start)
-            q = q.where(CalendarEvent.start_time >= start_dt)
-        except ValueError:
-            pass
+        q = q.where(CalendarEvent.start_time >= _parse_iso(start, "start"))
     if end:
-        try:
-            end_dt = datetime.datetime.fromisoformat(end)
-            q = q.where(CalendarEvent.end_time <= end_dt)
-        except ValueError:
-            pass
+        q = q.where(CalendarEvent.end_time <= _parse_iso(end, "end"))
 
     result = await db.execute(q)
     return [_event_to_response(e) for e in result.scalars().all()]
 
 
-@router.post("/events", response_model=EventResponse)
+@router.post("/events", response_model=EventResponse, status_code=201)
 async def create_event(evt: EventCreate, db: AsyncSession = Depends(get_db)):
-    try:
-        start = datetime.datetime.fromisoformat(evt.start_time)
-        end = datetime.datetime.fromisoformat(evt.end_time)
-    except ValueError:
-        raise HTTPException(400, "Invalid datetime format. Use ISO format (e.g. 2026-07-15T14:00:00)")
+    start = _parse_iso(evt.start_time, "start_time")
+    end = _parse_iso(evt.end_time, "end_time")
+    if end < start:
+        raise HTTPException(400, "end_time must be after start_time")
 
     record = CalendarEvent(
         account_id=evt.account_id,
@@ -102,9 +104,14 @@ async def update_event(event_id: int, evt: EventUpdate, db: AsyncSession = Depen
 
     updates = evt.model_dump(exclude_unset=True)
     if "start_time" in updates:
-        updates["start_time"] = datetime.datetime.fromisoformat(updates["start_time"])
+        updates["start_time"] = _parse_iso(updates["start_time"], "start_time")
     if "end_time" in updates:
-        updates["end_time"] = datetime.datetime.fromisoformat(updates["end_time"])
+        updates["end_time"] = _parse_iso(updates["end_time"], "end_time")
+
+    new_start = updates.get("start_time", record.start_time)
+    new_end = updates.get("end_time", record.end_time)
+    if new_end < new_start:
+        raise HTTPException(400, "end_time must be after start_time")
 
     for field, value in updates.items():
         setattr(record, field, value)

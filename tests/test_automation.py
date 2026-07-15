@@ -99,7 +99,7 @@ class TestAutomationAPICRUD:
             "is_enabled": True,
         }
         create = await client.post("/api/automation/rules", json=payload)
-        assert create.status_code == 200
+        assert create.status_code == 201
         data = create.json()
         assert data["name"] == "Test Rule"
         assert data["trigger_type"] == "new_email"
@@ -129,7 +129,41 @@ class TestAutomationAPICRUD:
             "cron_schedule": "*/5 * * * *",
             "is_enabled": True,
         })
-        assert resp.status_code == 200
+        assert resp.status_code == 201
+
+    @pytest.mark.asyncio
+    async def test_create_rule_with_invalid_cron_returns_400(self, client):
+        resp = await client.post("/api/automation/rules", json={
+            "name": "Bad Cron Expr",
+            "trigger_type": "cron_schedule",
+            "action_type": "auto_reply",
+            "action_config": {"body": "Hi"},
+            "cron_schedule": "every 5 minutes",
+            "is_enabled": True,
+        })
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_update_rule_cannot_create_invalid_state(self, client):
+        created = await client.post("/api/automation/rules", json={
+            "name": "Valid", "trigger_type": "new_email", "action_type": "star",
+        })
+        rule_id = created.json()["id"]
+        # Switching to cron trigger without a schedule must be rejected
+        resp = await client.put(f"/api/automation/rules/{rule_id}", json={
+            "trigger_type": "cron_schedule",
+        })
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_create_rule_with_invalid_regex_returns_400(self, client):
+        resp = await client.post("/api/automation/rules", json={
+            "name": "Bad Regex",
+            "trigger_type": "keyword_match",
+            "trigger_config": {"subject": "re:[invalid("},
+            "action_type": "star",
+        })
+        assert resp.status_code == 400
 
     @pytest.mark.asyncio
     async def test_update_rule(self, client):

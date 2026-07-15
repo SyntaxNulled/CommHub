@@ -25,11 +25,31 @@ class TestCalendarAPI:
             "start_time": "2026-07-16T09:00:00",
             "end_time": "2026-07-16T09:30:00",
         })
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         data = resp.json()
         assert data["title"] == "Team Standup"
         assert data["description"] == "Daily standup"
         assert "2026-07-16T09:00:00" in data["start_time"]
+
+    @pytest.mark.asyncio
+    async def test_create_event_end_before_start_returns_400(self, client, db_session):
+        from app.models import EmailAccount, ProviderType
+        acct = EmailAccount(email="rev@rev.com", provider=ProviderType.GMAIL)
+        db_session.add(acct)
+        await db_session.commit()
+
+        resp = await client.post("/api/calendar/events", json={
+            "account_id": acct.id,
+            "title": "Backwards",
+            "start_time": "2026-07-16T10:00:00",
+            "end_time": "2026-07-16T09:00:00",
+        })
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_list_events_invalid_date_filter_returns_400(self, client):
+        resp = await client.get("/api/calendar/events?start=not-a-date")
+        assert resp.status_code == 400
 
     @pytest.mark.asyncio
     async def test_list_events_with_date_filter(self, client, db_session):
