@@ -13,6 +13,7 @@ document.addEventListener('alpine:init', () => {
             { id: 'sent', label: 'Sent', icon: 'sent' },
             { id: 'drafts', label: 'Drafts', icon: 'draft' },
             { id: 'starred', label: 'Starred', icon: 'star' },
+            { id: 'snoozed', label: 'Snoozed', icon: 'bell' },
             { id: 'calendar', label: 'Calendar', icon: 'calendar' },
         ],
         toolLinks: [
@@ -40,10 +41,15 @@ document.addEventListener('alpine:init', () => {
         totalEmails: 0,
         unreadTotal: 0,
         emailsLoading: false,
-        confirmDelete: null, // { type: 'email'|'event'|'rule'|'aiConfig', id, label }
+        confirmDelete: null, // { type: 'email'|'event'|'rule'|'aiConfig'|'folder', id, label }
         _emailReq: 0,
         _searchTimer: null,
         _listenerAttached: false,
+        draggedEmailId: null,
+        contextMenu: null,
+        undoSendTimer: null,
+        undoSendEmailId: null,
+        undoSendSeconds: 0,
 
         // --- Calendar State ---
         events: [],
@@ -149,7 +155,7 @@ document.addEventListener('alpine:init', () => {
             return folder ? folder.name : 'CommHub';
         },
         get isMailPage() {
-            const mailPages = ['inbox', 'sent', 'drafts', 'starred'];
+            const mailPages = ['inbox', 'sent', 'drafts', 'starred', 'snoozed'];
             if (mailPages.includes(this.page)) return true;
             return this.folders.some(f => f.normalized_name === this.page.toUpperCase());
         },
@@ -165,6 +171,7 @@ document.addEventListener('alpine:init', () => {
             if (this.darkMode) document.documentElement.classList.add('dark');
             if (!this._listenerAttached) {
                 window.addEventListener('keydown', (e) => this.handleKeydown(e));
+                window.addEventListener('click', () => { this.contextMenu = null; });
                 this._listenerAttached = true;
             }
 
@@ -232,7 +239,8 @@ document.addEventListener('alpine:init', () => {
             if (pageId !== 'automation') this.closeRuleForm();
             if (!this.isMailPage) this.composeOpen = false;
             if (this.isMailPage) {
-                this.currentFolder = pageId === 'starred' ? 'STARRED' : pageId.toUpperCase();
+                const folderMap = { starred: 'STARRED', snoozed: 'SNOOZED' };
+                this.currentFolder = folderMap[pageId] || pageId.toUpperCase();
                 this.currentPage = 1;
                 this.loadEmails();
             }
@@ -445,8 +453,8 @@ document.addEventListener('alpine:init', () => {
                 });
                 if (res.ok) {
                     this.composeOpen = false;
-                    this.toast('Email sent', 'success');
-                    this.navigate('sent');
+                    const sentEmail = await res.json();
+                    this.startUndoSend(sentEmail.id);
                 } else {
                     const err = await res.json().catch(() => ({}));
                     this.toast(err.detail || 'Failed to send email', 'error');
@@ -999,6 +1007,112 @@ document.addEventListener('alpine:init', () => {
                 }
             } catch (e) { this.toast('Network error moving email', 'error'); }
         },
+        // --- Drag and Drop ---
+        onDragStart(email, event) {
+            this.draggedEmailId = email.id;
+            event.dataTransfer.effectAllowed = 'move';
+        },
+        onDragEnd() {
+            this.draggedEmailId = null;
+        },
+        onDrop(folderName, event) {
+            event.preventDefault();
+            if (this.draggedEmailId) {
+                this.moveEmailToFolder(this.draggedEmailId, folderName);
+            }
+            this.draggedEmailId = null;
+        },
+        onDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+        },
+
+        // --- Context Menu ---
+        openContextMenu(email, event) {
+            event.preventDefault();
+            this.contextMenu = { email, x: event.clientX, y: event.clientY };
+        },
+        closeContextMenu() {
+            this.contextMenu = null;
+        },
+        contextMenuMove(folderName) {
+            this.moveEmailToFolder(this.contextMenu?.email.id, folderName);
+            this.closeContextMenu();
+        },
+        contextMenuToggleStar() {
+            this.toggleStar(this.contextMenu?.email);
+            this.closeContextMenu();
+        },
+        contextMenuToggleRead() {
+            const email = this.contextMenu?.email;
+            if (!email) return;
+            fetch(`/api/emails/${email.id}/toggle-read`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => { email.is_read = data.is_read; this.loadUnreadCount(); });
+            this.closeContextMenu();
+        },
+        contextMenuSnooze(duration) {
+            const email = this.contextMenu?.email;
+            if (!email) return;
+            const until = new Date();
+            if (duration === '1h') until.setHours(until.getHours() + 1);
+            else if (duration === '3h') until.setHours(until.getHours() + 3);
+            else if (duration === 'tomorrow') { until.setDate(until.getDate() + 1); until.setHours(9, 0, 0, 0); }
+            else if (duration === 'nextweek') { until.setDate(until.getDate() + 7); until.setHours(9, 0, 0, 0); }
+            this.snoozeEmail(email.id, until.toISOString());
+            this.closeContextMenu();
+        },
+        async snoozeEmail(emailId, untilIso) {
+            try {
+                const res = await fetch(`/api/emails/${emailId}/snooze`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ until: untilIso }),
+                });
+                if (res.ok) {
+                    this.toast('Email snoozed', 'success');
+                    this.emails = this.emails.filter(e => e.id !== emailId);
+                    this.totalEmails = Math.max(0, this.totalEmails - 1);
+                    if (this.selectedEmail?.id === emailId) this.selectedEmail = null;
+                    this.loadUnreadCount();
+                } else { this.toast('Failed to snooze', 'error'); }
+            } catch (e) { this.toast('Network error', 'error'); }
+        },
+        contextMenuDelete() {
+            if (this.contextMenu) {
+                this.requestDelete('email', this.contextMenu.email.id, this.contextMenu.email.subject);
+            }
+            this.closeContextMenu();
+        },
+
+        // --- Undo Send ---
+        startUndoSend(emailId) {
+            this.undoSendEmailId = emailId;
+            this.undoSendSeconds = 10;
+            this.undoSendTimer = setInterval(() => {
+                this.undoSendSeconds--;
+                if (this.undoSendSeconds <= 0) {
+                    clearInterval(this.undoSendTimer);
+                    this.undoSendTimer = null;
+                    this.undoSendEmailId = null;
+                    this.toast('Email sent', 'success');
+                    if (this.currentFolder === 'SENT') this.loadEmails();
+                }
+            }, 1000);
+        },
+        async undoSend() {
+            if (!this.undoSendEmailId) return;
+            clearInterval(this.undoSendTimer);
+            this.undoSendTimer = null;
+            const emailId = this.undoSendEmailId;
+            this.undoSendEmailId = null;
+            this.undoSendSeconds = 0;
+            try {
+                const res = await fetch(`/api/emails/${emailId}/undo-send`, { method: 'POST' });
+                if (res.ok) { this.toast('Send cancelled', 'info'); }
+                else { this.toast('Too late to cancel', 'error'); }
+            } catch (e) { this.toast('Network error', 'error'); }
+        },
+
         folderColorClass(color) {
             const map = {
                 blue: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200',

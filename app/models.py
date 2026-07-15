@@ -49,6 +49,8 @@ class Email(Base):
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     is_starred: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     folder: Mapped[str] = mapped_column(String(128), default="INBOX")
+    snoozed_until: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    send_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     received_at: Mapped[datetime.datetime] = mapped_column(DateTime)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=utcnow)
 

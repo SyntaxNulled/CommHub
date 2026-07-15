@@ -10,6 +10,7 @@ from app.models import Email, EmailAccount, Folder
 router = APIRouter(prefix="/api/emails", tags=["emails"])
 
 SYSTEM_FOLDERS = {"INBOX", "SENT", "DRAFTS", "STARRED"}
+VIRTUAL_FOLDERS = {"SNOOZED"}
 
 
 async def _validate_folder(folder: str, db: AsyncSession) -> str:
@@ -18,6 +19,8 @@ async def _validate_folder(folder: str, db: AsyncSession) -> str:
     if normalized == "STARRED":
         return normalized
     if normalized in SYSTEM_FOLDERS:
+        return normalized
+    if normalized in VIRTUAL_FOLDERS:
         return normalized
     result = await db.execute(select(Folder).where(Folder.normalized_name == normalized))
     if result.scalar_one_or_none() is None:
@@ -37,6 +40,8 @@ class EmailResponse(BaseModel):
     is_read: bool
     is_starred: bool
     folder: str
+    snoozed_until: str | None = None
+    send_at: str | None = None
     received_at: str
 
 
@@ -68,8 +73,21 @@ def _email_to_response(e: Email, account_email: str = "") -> EmailResponse:
         from_address=e.from_address, from_name=e.from_name,
         to_addresses=e.to_addresses, subject=e.subject,
         body_text=e.body_text, is_read=e.is_read, is_starred=e.is_starred,
-        folder=e.folder, received_at=e.received_at.isoformat(),
+        folder=e.folder,
+        snoozed_until=e.snoozed_until.isoformat() if e.snoozed_until else None,
+        send_at=e.send_at.isoformat() if e.send_at else None,
+        received_at=e.received_at.isoformat(),
     )
+
+
+def _parse_iso_datetime(value: str, field: str) -> datetime.datetime:
+    try:
+        dt = datetime.datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        raise HTTPException(400, f"Invalid datetime for '{field}'. Use ISO format (e.g. 2026-07-15T14:00:00)")
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(datetime.UTC).replace(tzinfo=None)
+    return dt
 
 
 @router.get("", response_model=list[EmailResponse])
@@ -83,12 +101,17 @@ async def list_emails(
     db: AsyncSession = Depends(get_db),
 ):
     folder = await _validate_folder(folder, db)
+    now = datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
 
     q = select(Email)
-    if folder == "STARRED":
+    if folder == "SNOOZED":
+        q = q.where(Email.snoozed_until.isnot(None), Email.snoozed_until > now)
+    elif folder == "STARRED":
         q = q.where(Email.is_starred == True)
     else:
         q = q.where(Email.folder == folder)
+        q = q.where(Email.snoozed_until.is_(None))
+        q = q.where(Email.send_at.is_(None))
     if account_id is not None:
         q = q.where(Email.account_id == account_id)
     if q_search:
@@ -183,6 +206,7 @@ async def send_email(req: SendEmailRequest, db: AsyncSession = Depends(get_db)):
         is_read=True,
         folder="SENT",
         received_at=now,
+        send_at=now + datetime.timedelta(seconds=10),
     )
     db.add(email)
     await db.commit()
@@ -258,6 +282,46 @@ async def delete_email(email_id: int, db: AsyncSession = Depends(get_db)):
     email = result.scalar_one_or_none()
     if not email:
         raise HTTPException(404, "Email not found")
+    await db.delete(email)
+    await db.commit()
+    return {"deleted": email_id}
+
+
+class SnoozeRequest(BaseModel):
+    until: str
+
+
+@router.post("/{email_id}/snooze")
+async def snooze_email(email_id: int, req: SnoozeRequest, db: AsyncSession = Depends(get_db)):
+    until = _parse_iso_datetime(req.until, "until")
+    result = await db.execute(select(Email).where(Email.id == email_id))
+    email = result.scalar_one_or_none()
+    if not email:
+        raise HTTPException(404, "Email not found")
+    email.snoozed_until = until
+    await db.commit()
+    return {"id": email.id, "snoozed_until": until.isoformat()}
+
+
+@router.post("/{email_id}/unsnooze")
+async def unsnooze_email(email_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Email).where(Email.id == email_id))
+    email = result.scalar_one_or_none()
+    if not email:
+        raise HTTPException(404, "Email not found")
+    email.snoozed_until = None
+    await db.commit()
+    return {"id": email.id, "snoozed_until": None}
+
+
+@router.post("/{email_id}/undo-send")
+async def undo_send(email_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Email).where(Email.id == email_id))
+    email = result.scalar_one_or_none()
+    if not email:
+        raise HTTPException(404, "Email not found")
+    if email.send_at is None:
+        raise HTTPException(400, "Email has no pending send")
     await db.delete(email)
     await db.commit()
     return {"deleted": email_id}
