@@ -2,7 +2,7 @@ import datetime
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models import EmailAccount, Email, CalendarEvent, ProviderType
+from app.models import EmailAccount, Email, CalendarEvent, Folder, ProviderType
 
 
 FAKE_ACCOUNTS = [
@@ -14,10 +14,10 @@ FAKE_EMAILS = [
     {"folder": "INBOX", "from": "sarah@company.com", "from_name": "Sarah Chen", "subject": "Q3 Project Review", "body_text": "Hey Nikot,\n\nJust a reminder that the Q3 project review is scheduled for this Friday at 2pm. Please have the metrics ready.\n\nBest,\nSarah", "is_read": False, "received_at_days_ago": 0},
     {"folder": "INBOX", "from": "alerts@github.com", "from_name": "GitHub", "subject": "[commhub] Push to master (2 new commits)", "body_text": "nikot pushed 2 commits to master in commhub/commhub\n\n393c445 - Phase 7: Automation & Rules\n0ce04b4 - Phase 6: AI Engine", "is_read": True, "received_at_days_ago": 0},
     {"folder": "INBOX", "from": "mike@client.co", "from_name": "Mike Reynolds", "subject": "Invoice #1042 — Payment Confirmation", "body_text": "Hi,\n\nJust confirming we received your payment for invoice #1042. Thank you!\n\nRegards,\nMike", "is_read": True, "received_at_days_ago": 1},
-    {"folder": "INBOX", "from": "newsletter@devweekly.com", "from_name": "Dev Weekly", "subject": "This Week in Tech: AI Agents, Rust 2.0, and more", "body_text": "Top stories this week:\n- AI agents are taking over\n- Rust 2.0 released\n- Python 4.0 proposals", "is_read": False, "received_at_days_ago": 1},
-    {"folder": "INBOX", "from": "hr@company.com", "from_name": "HR Department", "subject": "Updated Holiday Calendar 2026", "body_text": "Please find attached the updated holiday calendar for the remainder of 2026.\n\nKey dates:\n- Aug 15: Company off-site\n- Sep 7: Labor Day\n- Nov 26-27: Thanksgiving", "is_read": False, "received_at_days_ago": 2},
-    {"folder": "INBOX", "from": "alice@startup.io", "from_name": "Alice Wang", "subject": "Partnership opportunity — let's chat!", "body_text": "Hey Nikot,\n\nI came across your work on CommHub and I'm really impressed. I'd love to discuss a potential partnership opportunity.\n\nAre you free for a quick call next week?\n\nAlice", "is_read": True, "received_at_days_ago": 3},
-    {"folder": "INBOX", "from": "noreply@amazon.com", "from_name": "Amazon", "subject": "Your order #303-124 has shipped", "body_text": "Your package is on its way!\n\nEstimated delivery: Thursday\n\nTrack your package at amazon.com/tracking", "is_read": True, "received_at_days_ago": 4},
+    {"folder": "NEWSLETTERS", "from": "newsletter@devweekly.com", "from_name": "Dev Weekly", "subject": "This Week in Tech: AI Agents, Rust 2.0, and more", "body_text": "Top stories this week:\n- AI agents are taking over\n- Rust 2.0 released\n- Python 4.0 proposals", "is_read": False, "received_at_days_ago": 1},
+    {"folder": "PROJECTS", "from": "hr@company.com", "from_name": "HR Department", "subject": "Updated Holiday Calendar 2026", "body_text": "Please find attached the updated holiday calendar for the remainder of 2026.\n\nKey dates:\n- Aug 15: Company off-site\n- Sep 7: Labor Day\n- Nov 26-27: Thanksgiving", "is_read": False, "received_at_days_ago": 2},
+    {"folder": "PROJECTS", "from": "alice@startup.io", "from_name": "Alice Wang", "subject": "Partnership opportunity — let's chat!", "body_text": "Hey Nikot,\n\nI came across your work on CommHub and I'm really impressed. I'd love to discuss a potential partnership opportunity.\n\nAre you free for a quick call next week?\n\nAlice", "is_read": True, "received_at_days_ago": 3},
+    {"folder": "RECEIPTS", "from": "noreply@amazon.com", "from_name": "Amazon", "subject": "Your order #303-124 has shipped", "body_text": "Your package is on its way!\n\nEstimated delivery: Thursday\n\nTrack your package at amazon.com/tracking", "is_read": True, "received_at_days_ago": 4},
     {"folder": "SENT", "from": "nikot@work.com", "from_name": "Nikot", "subject": "Re: Q3 Project Review", "body_text": "Hi Sarah,\n\nGot it. I'll have the metrics ready by Friday morning.\n\nBest,\nNikot", "is_read": True, "received_at_days_ago": 0},
     {"folder": "SENT", "from": "nikot@work.com", "from_name": "Nikot", "subject": "Updated deployment schedule", "body_text": "Team,\n\nI've updated the deployment schedule. Please review and let me know if there are any conflicts.\n\nhttps://docs.google.com/...\n\nNikot", "is_read": True, "received_at_days_ago": 1},
     {"folder": "SENT", "from": "nikot@personal.com", "from_name": "Nikot", "subject": "House sitting instructions", "body_text": "Hey,\n\nThanks for watching the place! Here's what you need to know:\n- Water the plants every other day\n- Mail is in the box by the door\n- Emergency number: 555-0123\n\nCheers,\nNikot", "is_read": True, "received_at_days_ago": 2},
@@ -46,6 +46,15 @@ async def seed_demo_data(session: AsyncSession):
 
     now = datetime.datetime.now(datetime.UTC)
     first_account_id = None
+
+    # Custom folders for demo
+    custom_folders = [
+        ("Projects", "blue", "briefcase"),
+        ("Newsletters", "violet", "document"),
+        ("Receipts", "emerald", "tag"),
+    ]
+    for name, color, icon in custom_folders:
+        session.add(Folder(name=name, normalized_name=name.upper(), color=color, icon=icon, is_system=False))
 
     for acct_data in FAKE_ACCOUNTS:
         acct = EmailAccount(

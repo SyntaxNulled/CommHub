@@ -13,7 +13,7 @@ from app.automation.engine import execute_cron_rule, evaluate_trigger
 router = APIRouter(prefix="/api/automation", tags=["automation"])
 
 TRIGGER_TYPES = ["new_email", "keyword_match", "cron_schedule"]
-ACTION_TYPES = ["auto_reply", "categorize", "mark_read", "star", "forward"]
+ACTION_TYPES = ["auto_reply", "categorize", "ai_categorize", "mark_read", "star", "forward"]
 
 
 class RuleCreate(BaseModel):

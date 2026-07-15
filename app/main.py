@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db, init_db, async_session_factory
 from app.models import AutomationRule
-from app.routers import health, ai, automation, emails, calendar, accounts
+from app.routers import health, ai, automation, emails, calendar, accounts, folders
 from app.automation.scheduler import start_scheduler, stop_scheduler, add_cron_job
 from app.automation.engine import execute_cron_rule
 from app.mock_data import seed_demo_data as _seed_demo_data
@@ -49,6 +49,7 @@ app.include_router(automation.router)
 app.include_router(emails.router)
 app.include_router(calendar.router)
 app.include_router(accounts.router)
+app.include_router(folders.router)
 
 
 @app.post("/api/seed")

@@ -22,7 +22,7 @@ async def evaluate_trigger(session: AsyncSession, trigger_type: str, context: di
     for rule in rules:
         if _matches_trigger(rule.trigger_config, context):
             logger.info(f"Rule '{rule.name}' triggered ({trigger_type})")
-            output = execute_action(rule.name, rule.action_type, rule.action_config, context)
+            output = await execute_action(rule.name, rule.action_type, rule.action_config, context)
             outputs.append({"rule_id": rule.id, "rule_name": rule.name, "output": output})
     return outputs
 
@@ -56,4 +56,4 @@ async def execute_cron_rule(rule_id: int):
         if not rule or not rule.is_enabled:
             return
         logger.info(f"Cron job executing rule '{rule.name}' (id={rule_id})")
-        execute_action(rule.name, rule.action_type, rule.action_config)
+        await execute_action(rule.name, rule.action_type, rule.action_config)

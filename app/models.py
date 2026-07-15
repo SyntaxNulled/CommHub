@@ -77,6 +77,19 @@ class CalendarEvent(Base):
     account: Mapped["EmailAccount"] = relationship(back_populates="calendar_events")
 
 
+class Folder(Base):
+    __tablename__ = "folders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    normalized_name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    color: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    icon: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class AutomationRule(Base):
     __tablename__ = "automation_rules"
 

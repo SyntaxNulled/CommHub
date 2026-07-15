@@ -65,6 +65,28 @@
                 </template>
             </nav>
 
+            <!-- Custom folders -->
+            <div class="border-t border-gray-200 dark:border-gray-800 pt-2 pb-2 px-2 space-y-0.5">
+                <div class="flex items-center justify-between px-2 mb-1">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Folders</span>
+                    <button @click="openNewFolder()" class="text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150" aria-label="Create folder">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                </div>
+                <template x-for="folder in folders.filter(f => !f.is_system)" :key="folder.id">
+                    <button type="button"
+                            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 cursor-pointer"
+                            :class="page === folder.normalized_name.toLowerCase() ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'"
+                            :aria-current="page === folder.normalized_name.toLowerCase() ? 'page' : null"
+                            @click="navigate(folder.normalized_name.toLowerCase())">
+                        <span class="shrink-0" x-html="folderIconSVG(folder.icon)"></span>
+                        <span x-text="folder.name"></span>
+                        <span class="ml-auto w-2 h-2 rounded-full" :style="'background-color: ' + (folderColorMap[folder.color] || folder.color || '#2563EB')"></span>
+                    </button>
+                </template>
+                <p x-show="folders.filter(f => !f.is_system).length === 0" class="px-2 text-xs text-gray-500 dark:text-gray-400">No custom folders yet.</p>
+            </div>
+
             <div class="border-t border-gray-200 dark:border-gray-800 pt-2 pb-2 px-2 space-y-0.5">
                 <template x-for="link in toolLinks" :key="link.id">
                     <button type="button"
@@ -225,11 +247,12 @@
                                     <ul class="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800/80" role="list">
                                         <template x-for="email in filteredEmails" :key="email.id">
                                             <li>
-                                                <div role="button" tabindex="0"
-                                                     @click="selectEmail(email)"
-                                                     @keydown.enter="selectEmail(email)"
-                                                     @keydown.space.prevent="selectEmail(email)"
-                                                     class="flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors duration-150 border-l-2 rounded-r-lg"
+                                                     <div role="button" tabindex="0"
+                                                      @click="selectEmail(email)"
+                                                      @keydown.enter="selectEmail(email)"
+                                                      @keydown.space.prevent="selectEmail(email)"
+                                                      class="group flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors duration-150 border-l-2 rounded-r-lg"
+
                                                      :class="[
                                                         email.is_read ? 'border-l-transparent' : 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/15',
                                                         selectedEmail?.id === email.id ? 'bg-blue-100/70 dark:bg-blue-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-900'
@@ -249,18 +272,31 @@
                                                              :class="email.is_read ? 'text-gray-600 dark:text-gray-400' : 'text-gray-900 dark:text-gray-200 font-medium'"
                                                              x-text="email.subject"></div>
                                                         <div class="text-xs text-gray-500 truncate" x-text="truncate(email.body_text, 90)"></div>
+                                                     </div>
+                                                    <div class="flex shrink-0 items-start gap-0.5">
+                                                        <button @click.stop="toggleStar(email)"
+                                                                 class="shrink-0 mt-1 p-1 rounded cursor-pointer transition-colors duration-150"
+                                                                 :class="email.is_starred ? 'text-amber-400 hover:text-amber-500' : 'text-gray-300 dark:text-gray-600 hover:text-amber-400'"
+                                                                 :aria-label="email.is_starred ? 'Unstar email' : 'Star email'"
+                                                                 :aria-pressed="email.is_starred">
+                                                            <svg class="w-4 h-4" :fill="email.is_starred ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                                        </button>
+                                                        <div class="relative opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+                                                            <label :for="'move-list-' + email.id" class="sr-only">Move to folder</label>
+                                                            <select :id="'move-list-' + email.id" @change.stop="moveEmailToFolder(email.id, $event.target.value); $event.target.value = ''"
+                                                                    class="px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-lg text-xs bg-white dark:bg-gray-900 cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
+                                                                <option value="" selected disabled>Move</option>
+                                                                <template x-for="folder in folders" :key="folder.id">
+                                                                    <option :value="folder.normalized_name" x-text="folder.name"></option>
+                                                                </template>
+                                                            </select>
+                                                        </div>
                                                     </div>
-                                                    <button @click.stop="toggleStar(email)"
-                                                            class="shrink-0 mt-1 p-1 rounded cursor-pointer transition-colors duration-150"
-                                                            :class="email.is_starred ? 'text-amber-400 hover:text-amber-500' : 'text-gray-300 dark:text-gray-600 hover:text-amber-400'"
-                                                            :aria-label="email.is_starred ? 'Unstar email' : 'Star email'"
-                                                            :aria-pressed="email.is_starred">
-                                                        <svg class="w-4 h-4" :fill="email.is_starred ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                                    </button>
                                                 </div>
                                             </li>
                                         </template>
                                     </ul>
+
 
                                     <!-- Pagination -->
                                     <nav x-show="totalPages > 1" class="shrink-0 flex items-center justify-between px-3 py-2 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-400" aria-label="Email pages">
@@ -320,7 +356,7 @@
 
                                         <div class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed" x-text="selectedEmail.body_text"></div>
 
-                                        <div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex gap-2">
+                                        <div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap gap-2">
                                             <button @click="replyToSelected()"
                                                     class="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-150 cursor-pointer">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
@@ -331,6 +367,16 @@
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                                                 Ask AI
                                             </button>
+                                            <div class="relative">
+                                                <label for="move-detail" class="sr-only">Move to folder</label>
+                                                <select id="move-detail" @change="moveEmailToFolder(selectedEmail.id, $event.target.value); $event.target.value = ''"
+                                                        class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
+                                                    <option value="" selected disabled>Move to...</option>
+                                                    <template x-for="folder in folders" :key="folder.id">
+                                                        <option :value="folder.normalized_name" x-text="folder.name + (folder.is_system ? '' : ' (custom)')"></option>
+                                                    </template>
+                                                </select>
+                                            </div>
                                         </div>
                                     </article>
                                 </template>
@@ -607,6 +653,16 @@
                                         <input id="rule-forward" type="email" x-model="ruleForm.action_config.to" placeholder="forward@example.com"
                                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
                                     </div>
+                                    <div x-show="ruleForm.action_type === 'ai_categorize'">
+                                        <label for="rule-fallback" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Fallback folder if AI is unsure</label>
+                                        <select id="rule-fallback" x-model="ruleForm.action_config.fallback_folder"
+                                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 cursor-pointer">
+                                            <template x-for="folder in folders" :key="folder.id">
+                                                <option :value="folder.normalized_name" x-text="folder.name"></option>
+                                            </template>
+                                        </select>
+                                        <p class="text-xs text-gray-500 mt-1">Requires an active AI provider in Settings.</p>
+                                    </div>
                                     <div class="flex gap-2 pt-1">
                                         <button @click="saveRule()" :disabled="ruleFormSaving"
                                                 class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
@@ -644,6 +700,32 @@
                                             <div>
                                                 <div class="font-medium" x-text="acct.email"></div>
                                                 <div class="text-xs text-gray-500 capitalize" x-text="acct.provider + (acct.display_name ? ' · ' + acct.display_name : '')"></div>
+                                            </div>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </div>
+
+                            <div class="border border-gray-200 dark:border-gray-800 rounded-lg p-5 mb-6 bg-white dark:bg-gray-900">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h4 class="font-medium">Folders</h4>
+                                    <button @click="openNewFolder()" class="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 cursor-pointer transition-colors duration-150">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                        New
+                                    </button>
+                                </div>
+                                <ul class="space-y-2" role="list">
+                                    <template x-for="folder in folders" :key="folder.id">
+                                        <li class="flex items-center justify-between gap-2 text-sm border border-gray-200 dark:border-gray-800 rounded-lg p-2.5">
+                                            <div class="flex items-center gap-2 min-w-0">
+                                                <span class="shrink-0" x-html="folderIconSVG(folder.icon)"></span>
+                                                <span class="w-3 h-3 rounded-full shrink-0" :style="'background-color: ' + (folderColorMap[folder.color] || folder.color || '#2563EB')"></span>
+                                                <span class="truncate" x-text="folder.name"></span>
+                                                <span x-show="folder.is_system" class="text-[10px] text-gray-500">(system)</span>
+                                            </div>
+                                            <div class="flex gap-1 shrink-0">
+                                                <button x-show="!folder.is_system" @click="editFolder(folder)" class="text-xs text-gray-600 dark:text-gray-400 px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150">Edit</button>
+                                                <button x-show="!folder.is_system" @click="requestDelete('folder', folder.id, folder.name)" class="text-xs text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer transition-colors duration-150">Delete</button>
                                             </div>
                                         </li>
                                     </template>
@@ -975,6 +1057,58 @@
 
                 <div class="flex justify-end pt-2">
                     <button @click="closeAiOrganize()" class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ Folder Form Modal ============ -->
+        <div x-cloak x-show="folderFormOpen" class="fixed inset-0 bg-black/40 dark:bg-black/60 z-[55] flex items-center justify-center p-4"
+             @click.self="closeFolderForm()" role="dialog" aria-modal="true" aria-labelledby="folder-form-title">
+            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl w-96 max-w-full p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 id="folder-form-title" class="font-semibold" x-text="folderFormEdit ? 'Edit Folder' : 'New Folder'"></h4>
+                    <button @click="closeFolderForm()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150" aria-label="Close folder form">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label for="folder-name" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                        <input id="folder-name" type="text" x-model="folderForm.name" placeholder="Projects, Receipts, Newsletters..."
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Color</label>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="color in folderColors" :key="color">
+                                <button type="button" @click="folderForm.color = color"
+                                        class="w-6 h-6 rounded-full cursor-pointer ring-2 ring-offset-1 transition-all duration-150"
+                                        :class="folderForm.color === color ? 'ring-gray-400 dark:ring-gray-500' : 'ring-transparent'"
+                                        :style="'background-color: ' + (folderColorMap[color] || color)">
+                                    <span class="sr-only" x-text="color"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Icon</label>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="icon in folderIcons" :key="icon">
+                                <button type="button" @click="folderForm.icon = icon"
+                                        class="p-2 rounded-lg cursor-pointer transition-colors duration-150"
+                                        :class="folderForm.icon === icon ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
+                                        x-html="folderIconSVG(icon)">
+                                    <span class="sr-only" x-text="icon"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 pt-1">
+                        <button @click="saveFolder()" :disabled="folderFormSaving"
+                                class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
+                                x-text="folderFormSaving ? 'Saving...' : 'Save'"></button>
+                        <button @click="closeFolderForm()" class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150">Cancel</button>
+                    </div>
                 </div>
             </div>
         </div>
