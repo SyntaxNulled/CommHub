@@ -72,6 +72,7 @@ class CalendarEvent(Base):
     end_time: Mapped[datetime.datetime] = mapped_column(DateTime)
     is_all_day: Mapped[bool] = mapped_column(Boolean, default=False)
     category: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    rrule: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=utcnow)
 
     account: Mapped["EmailAccount"] = relationship(back_populates="calendar_events")

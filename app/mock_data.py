@@ -29,11 +29,11 @@ FAKE_EMAILS = [
 FAKE_EVENTS = [
     {"title": "Q3 Project Review", "description": "Quarterly review with Sarah", "category": "work", "start_days_from_now": 3, "start_hour": 14, "duration_hours": 1},
     {"title": "Promotion Discussion", "description": "Meeting with David about career progression", "category": "important", "start_days_from_now": 2, "start_hour": 15, "duration_hours": 1},
-    {"title": "Team Standup", "description": "Daily standup with engineering team", "category": "meeting", "start_days_from_now": 0, "start_hour": 9, "duration_hours": 0.5},
+    {"title": "Team Standup", "description": "Daily standup with engineering team", "category": "meeting", "start_days_from_now": 0, "start_hour": 9, "duration_hours": 0.5, "rrule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;COUNT=60"},
     {"title": "Lunch with Alice", "description": "Partnership discussion with Alice Wang", "category": "work", "start_days_from_now": 4, "start_hour": 12, "duration_hours": 1},
     {"title": "Dentist Appointment", "description": "Regular checkup", "category": "personal", "start_days_from_now": 5, "start_hour": 10, "duration_hours": 1},
     {"title": "Company Off-site", "description": "Annual company off-site event", "category": "travel", "start_days_from_now": 7, "start_hour": 8, "duration_hours": 8},
-    {"title": "Gym", "description": "Weekly gym session", "category": "personal", "start_days_from_now": 1, "start_hour": 7, "duration_hours": 1},
+    {"title": "Gym", "description": "Weekly gym session", "category": "personal", "start_days_from_now": 1, "start_hour": 7, "duration_hours": 1, "rrule": "FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=52"},
     {"title": "Code Review Session", "description": "Review PRs with the team", "category": "meeting", "start_days_from_now": 2, "start_hour": 11, "duration_hours": 1.5},
 ]
 
@@ -97,6 +97,7 @@ async def seed_demo_data(session: AsyncSession):
             title=evt_data["title"],
             description=evt_data["description"],
             category=evt_data.get("category", "other"),
+            rrule=evt_data.get("rrule"),
             start_time=start,
             end_time=end,
         )
