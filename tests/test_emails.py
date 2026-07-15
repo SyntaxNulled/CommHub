@@ -35,7 +35,8 @@ class TestEmailAPI:
         assert data[0]["is_read"] is False
 
     @pytest.mark.asyncio
-    async def test_get_email_marks_as_read(self, client, db_session):
+    async def test_get_email_does_not_mutate_read_state(self, client, db_session):
+        """GET must be safe — read state changes only via the explicit mark-read endpoint."""
         acct = EmailAccount(email="test@test.com", provider=ProviderType.GMAIL)
         db_session.add(acct)
         await db_session.commit()
@@ -51,7 +52,62 @@ class TestEmailAPI:
 
         resp = await client.get(f"/api/emails/{email.id}")
         assert resp.status_code == 200
-        assert resp.json()["is_read"] is True
+        assert resp.json()["is_read"] is False
+
+        mark = await client.post(f"/api/emails/{email.id}/mark-read")
+        assert mark.status_code == 200
+        assert mark.json()["is_read"] is True
+
+        resp2 = await client.get(f"/api/emails/{email.id}")
+        assert resp2.json()["is_read"] is True
+
+    @pytest.mark.asyncio
+    async def test_unknown_folder_returns_400(self, client):
+        resp = await client.get("/api/emails?folder=TRASH")
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_unread_count(self, client, db_session):
+        acct = EmailAccount(email="uc@uc.com", provider=ProviderType.GMAIL)
+        db_session.add(acct)
+        await db_session.commit()
+        import datetime
+        for i, read in enumerate([False, False, True]):
+            db_session.add(Email(
+                account_id=acct.id, provider_message_id=f"uc-{i}",
+                from_address="a@b.com", to_addresses="uc@uc.com",
+                subject=f"E{i}", folder="INBOX", is_read=read,
+                received_at=datetime.datetime.now(datetime.UTC),
+            ))
+        await db_session.commit()
+
+        resp = await client.get("/api/emails/unread-count")
+        assert resp.status_code == 200
+        assert resp.json()["unread"] == 2
+
+    @pytest.mark.asyncio
+    async def test_server_side_search(self, client, db_session):
+        acct = EmailAccount(email="s@s.com", provider=ProviderType.GMAIL)
+        db_session.add(acct)
+        await db_session.commit()
+        import datetime
+        db_session.add_all([
+            Email(account_id=acct.id, provider_message_id="s-1",
+                  from_address="alice@x.com", to_addresses="s@s.com",
+                  subject="Quarterly report", body_text="numbers inside",
+                  folder="INBOX", received_at=datetime.datetime.now(datetime.UTC)),
+            Email(account_id=acct.id, provider_message_id="s-2",
+                  from_address="bob@x.com", to_addresses="s@s.com",
+                  subject="Lunch plans", body_text="pizza?",
+                  folder="INBOX", received_at=datetime.datetime.now(datetime.UTC)),
+        ])
+        await db_session.commit()
+
+        resp = await client.get("/api/emails?folder=INBOX&q=quarterly")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["subject"] == "Quarterly report"
+        assert resp.headers["X-Total-Count"] == "1"
 
     @pytest.mark.asyncio
     async def test_toggle_star(self, client, db_session):
@@ -81,7 +137,7 @@ class TestEmailAPI:
             "account_id": acct.id, "to": "you@you.com",
             "subject": "Test Send", "body": "Hello!",
         })
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         assert resp.json()["folder"] == "SENT"
         assert resp.json()["subject"] == "Test Send"
 
@@ -94,8 +150,19 @@ class TestEmailAPI:
         resp = await client.post("/api/emails/draft", json={
             "account_id": acct.id, "to": "", "subject": "Draft", "body": "WIP",
         })
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         assert resp.json()["folder"] == "DRAFTS"
+
+    @pytest.mark.asyncio
+    async def test_send_email_without_recipient_returns_400(self, client, db_session):
+        acct = EmailAccount(email="nr@nr.com", provider=ProviderType.GMAIL)
+        db_session.add(acct)
+        await db_session.commit()
+
+        resp = await client.post("/api/emails/send", json={
+            "account_id": acct.id, "to": "   ", "subject": "No recipient", "body": "x",
+        })
+        assert resp.status_code == 400
 
     @pytest.mark.asyncio
     async def test_delete_email(self, client, db_session):

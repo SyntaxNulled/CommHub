@@ -1,7 +1,7 @@
 import datetime
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import async_session_factory
 from app.models import EmailAccount, Email, CalendarEvent, ProviderType
 
 
@@ -38,54 +38,64 @@ FAKE_EVENTS = [
 ]
 
 
-async def seed_demo_data():
-    async with async_session_factory() as session:
-        existing = await session.execute(select(EmailAccount))
-        if existing.scalars().first():
-            return {"status": "already_seeded"}
+async def seed_demo_data(session: AsyncSession):
+    """Seed demo data using the caller's session (respects test overrides)."""
+    existing = await session.execute(select(EmailAccount))
+    if existing.scalars().first():
+        return {"status": "already_seeded"}
 
-        now = datetime.datetime.now(datetime.UTC)
+    now = datetime.datetime.now(datetime.UTC)
+    first_account_id = None
 
-        for acct_data in FAKE_ACCOUNTS:
-            acct = EmailAccount(
-                email=acct_data["email"],
-                provider=acct_data["provider"],
-                display_name=acct_data["display_name"],
+    for acct_data in FAKE_ACCOUNTS:
+        acct = EmailAccount(
+            email=acct_data["email"],
+            provider=acct_data["provider"],
+            display_name=acct_data["display_name"],
+        )
+        session.add(acct)
+        await session.flush()
+        if first_account_id is None:
+            first_account_id = acct.id
+
+        # Split emails across the two accounts (work-ish vs personal-ish)
+        account_emails = FAKE_EMAILS if acct_data["display_name"] == "Work" else []
+        for i, email_data in enumerate(account_emails):
+            received = now - datetime.timedelta(days=email_data["received_at_days_ago"], minutes=i)
+            email = Email(
+                account_id=acct.id,
+                provider_message_id=f"mock-{acct.id}-{i}",
+                thread_id=None,
+                from_address=email_data["from"],
+                from_name=email_data["from_name"],
+                to_addresses=acct.email,
+                subject=email_data["subject"],
+                body_text=email_data["body_text"],
+                is_read=email_data["is_read"],
+                is_starred=(email_data["folder"] == "STARRED"),
+                folder=email_data["folder"] if email_data["folder"] != "STARRED" else "INBOX",
+                received_at=received,
             )
-            session.add(acct)
-            await session.flush()
+            session.add(email)
 
-            for email_data in FAKE_EMAILS:
-                received = now - datetime.timedelta(days=email_data["received_at_days_ago"])
-                email = Email(
-                    account_id=acct.id,
-                    provider_message_id=f"mock-{acct.id}-{hash(email_data['subject'])}",
-                    thread_id=None,
-                    from_address=email_data["from"],
-                    from_name=email_data["from_name"],
-                    to_addresses=acct.email,
-                    subject=email_data["subject"],
-                    body_text=email_data["body_text"],
-                    is_read=email_data["is_read"],
-                    is_starred=(email_data["folder"] == "STARRED"),
-                    folder=email_data["folder"],
-                    received_at=received,
-                )
-                session.add(email)
+    for i, evt_data in enumerate(FAKE_EVENTS):
+        start = now + datetime.timedelta(days=evt_data["start_days_from_now"])
+        start = start.replace(hour=evt_data["start_hour"], minute=0, second=0, microsecond=0)
+        end = start + datetime.timedelta(hours=evt_data["duration_hours"])
+        event = CalendarEvent(
+            account_id=first_account_id,
+            provider_event_id=f"mock-ev-{i}",
+            title=evt_data["title"],
+            description=evt_data["description"],
+            start_time=start,
+            end_time=end,
+        )
+        session.add(event)
 
-        for evt_data in FAKE_EVENTS:
-            start = now + datetime.timedelta(days=evt_data["start_days_from_now"])
-            start = start.replace(hour=evt_data["start_hour"], minute=0, second=0, microsecond=0)
-            end = start + datetime.timedelta(hours=evt_data["duration_hours"])
-            event = CalendarEvent(
-                account_id=1,
-                provider_event_id=f"mock-ev-{hash(evt_data['title'])}",
-                title=evt_data["title"],
-                description=evt_data["description"],
-                start_time=start,
-                end_time=end,
-            )
-            session.add(event)
-
+    try:
         await session.commit()
-        return {"status": "seeded", "accounts": len(FAKE_ACCOUNTS), "emails": len(FAKE_EMAILS) * len(FAKE_ACCOUNTS), "events": len(FAKE_EVENTS)}
+    except IntegrityError:
+        await session.rollback()
+        return {"status": "already_seeded"}
+
+    return {"status": "seeded", "accounts": len(FAKE_ACCOUNTS), "emails": len(FAKE_EMAILS), "events": len(FAKE_EVENTS)}

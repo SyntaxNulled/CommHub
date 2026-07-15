@@ -63,24 +63,49 @@ class TestAIProviderConfigCRUD:
             "max_tokens": 2048,
         }
         create_resp = await client.post("/api/ai/configs", json=payload)
-        assert create_resp.status_code == 200
+        assert create_resp.status_code == 201
         data = create_resp.json()
         assert data["provider_type"] == "openai"
         assert data["display_name"] == "My OpenAI"
         assert data["is_active"] is False
+        # Secret must never be echoed back
+        assert "api_key" not in data
+        assert data["has_api_key"] is True
+        assert data["api_key_masked"].startswith("sk-")
+        assert "test123" not in data["api_key_masked"]
 
         list_resp = await client.get("/api/ai/configs")
         assert list_resp.status_code == 200
         configs = list_resp.json()
         assert len(configs) == 1
         assert configs[0]["provider_type"] == "openai"
+        assert "api_key" not in configs[0]
 
     @pytest.mark.asyncio
-    async def test_create_duplicate_provider_returns_400(self, client):
+    async def test_create_duplicate_provider_returns_409(self, client):
         payload = {"provider_type": "openai", "display_name": "Test", "api_key": "sk-test"}
         await client.post("/api/ai/configs", json=payload)
         resp = await client.post("/api/ai/configs", json=payload)
+        assert resp.status_code == 409
+
+    @pytest.mark.asyncio
+    async def test_create_unknown_provider_returns_400(self, client):
+        resp = await client.post("/api/ai/configs", json={
+            "provider_type": "skynet", "display_name": "Nope",
+        })
         assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_activating_provider_deactivates_others(self, client):
+        await client.post("/api/ai/configs", json={"provider_type": "openai", "display_name": "A"})
+        await client.post("/api/ai/configs", json={"provider_type": "anthropic", "display_name": "B"})
+        await client.put("/api/ai/configs/openai", json={"is_active": True})
+        await client.put("/api/ai/configs/anthropic", json={"is_active": True})
+
+        configs = (await client.get("/api/ai/configs")).json()
+        active = [c for c in configs if c["is_active"]]
+        assert len(active) == 1
+        assert active[0]["provider_type"] == "anthropic"
 
     @pytest.mark.asyncio
     async def test_update_config(self, client):

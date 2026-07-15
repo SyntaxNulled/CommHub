@@ -1,22 +1,28 @@
-// CommHub Frontend — Alpine.js + vanilla JS
+// CommHub Frontend — Alpine.js
 document.addEventListener('alpine:init', () => {
     Alpine.data('app', () => ({
-        // Navigation
+        // --- Navigation ---
         page: 'inbox',
         health: null,
         loading: true,
-        error: null,
         darkMode: localStorage.getItem('commhub-dark') === 'true',
+        sidebarOpen: false, // mobile drawer
 
-        sidebarLinks: [
+        mailLinks: [
             { id: 'inbox', label: 'Inbox', icon: 'inbox' },
             { id: 'sent', label: 'Sent', icon: 'sent' },
             { id: 'drafts', label: 'Drafts', icon: 'draft' },
             { id: 'starred', label: 'Starred', icon: 'star' },
             { id: 'calendar', label: 'Calendar', icon: 'calendar' },
+        ],
+        toolLinks: [
             { id: 'automation', label: 'Automation', icon: 'automation' },
             { id: 'settings', label: 'Settings', icon: 'settings' },
         ],
+
+        // --- Toasts ---
+        toasts: [],
+        _toastId: 0,
 
         // --- Email State ---
         accounts: [],
@@ -24,18 +30,26 @@ document.addEventListener('alpine:init', () => {
         selectedEmail: null,
         currentFolder: 'INBOX',
         composeOpen: false,
-        composeForm: { account_id: 1, to: '', subject: '', body: '' },
+        composeForm: { account_id: null, to: '', subject: '', body: '' },
+        sending: false,
         searchQuery: '',
         searchFilter: 'all',
         shortcutsOpen: false,
         currentPage: 1,
         pageSize: 20,
         totalEmails: 0,
+        unreadTotal: 0,
+        emailsLoading: false,
+        confirmDelete: null, // { type: 'email'|'event'|'rule'|'aiConfig', id, label }
+        _emailReq: 0,
+        _searchTimer: null,
+        _listenerAttached: false,
 
         // --- Calendar State ---
         events: [],
         calendarDays: [],
         calendarWeekStart: null,
+        calendarOffsetWeeks: 0,
         eventFormOpen: false,
         eventForm: { title: '', description: '', start_time: '', end_time: '', is_all_day: false },
         editingEventId: null,
@@ -48,7 +62,7 @@ document.addEventListener('alpine:init', () => {
         aiResult: '',
         aiResultProvider: '',
         aiError: '',
-        aiToneSelector: false,
+        aiCopied: false,
 
         // AI Config
         aiConfigs: [],
@@ -59,7 +73,34 @@ document.addEventListener('alpine:init', () => {
             provider_type: '', display_name: '', api_key: '', base_url: '',
             model: '', temperature: 0.7, max_tokens: 1024,
         },
+        aiFormError: '',
+        aiFormSaving: false,
 
+        // --- Automation State ---
+        automationRules: [],
+        triggerTypes: [],
+        actionTypes: [],
+        ruleFormOpen: false,
+        ruleFormEdit: false,
+        ruleFormEditId: null,
+        ruleFormSaving: false,
+        ruleForm: {
+            name: '', description: '', trigger_type: 'new_email',
+            trigger_config: {}, action_type: 'auto_reply',
+            action_config: {}, cron_schedule: '', is_enabled: true, account_id: null,
+        },
+
+        // --- Computed ---
+        get filteredEmails() {
+            let list = this.emails;
+            if (this.searchFilter === 'unread') list = list.filter(e => !e.is_read);
+            else if (this.searchFilter === 'read') list = list.filter(e => e.is_read);
+            else if (this.searchFilter === 'starred') list = list.filter(e => e.is_starred);
+            return list;
+        },
+        get totalPages() {
+            return Math.max(1, Math.ceil(this.totalEmails / this.pageSize));
+        },
         get unconfiguredProviders() {
             const configured = this.aiConfigs.map(c => c.provider_type);
             return this.availableProviders.filter(p => !configured.includes(p));
@@ -68,58 +109,37 @@ document.addEventListener('alpine:init', () => {
             const active = this.aiConfigs.find(c => c.is_active);
             return active ? active.display_name : null;
         },
-        get unreadCount() {
-            return this.emails.filter(e => !e.is_read).length;
-        },
         get accountOptions() {
             return this.accounts.map(a => ({ value: a.id, label: a.email }));
         },
-        get totalPages() {
-            return Math.max(1, Math.ceil(this.totalEmails / this.pageSize));
+        get pageTitle() {
+            const titles = { inbox: 'Inbox', sent: 'Sent', drafts: 'Drafts', starred: 'Starred', calendar: 'Calendar', automation: 'Automation', settings: 'Settings' };
+            return titles[this.page] || 'CommHub';
         },
-        get filteredEmails() {
-            let list = this.emails;
-            if (this.searchFilter === 'unread') list = list.filter(e => !e.is_read);
-            else if (this.searchFilter === 'read') list = list.filter(e => e.is_read);
-            else if (this.searchFilter === 'starred') list = list.filter(e => e.is_starred);
-            if (this.searchQuery.trim()) {
-                const q = this.searchQuery.toLowerCase();
-                list = list.filter(e =>
-                    (e.subject && e.subject.toLowerCase().includes(q)) ||
-                    (e.from_address && e.from_address.toLowerCase().includes(q)) ||
-                    (e.from_name && e.from_name.toLowerCase().includes(q)) ||
-                    (e.body_text && e.body_text.toLowerCase().includes(q))
-                );
-            }
-            return list;
+        get isMailPage() {
+            return ['inbox', 'sent', 'drafts', 'starred'].includes(this.page);
         },
 
-        // --- Automation State ---
-        automationRules: [],
-        triggerTypes: [],
-        actionTypes: [],
-        scheduledJobs: [],
-        ruleFormOpen: false,
-        ruleFormEdit: false,
-        ruleForm: {
-            name: '', description: '', trigger_type: 'new_email',
-            trigger_config: {}, action_type: 'auto_reply',
-            action_config: {}, cron_schedule: '', is_enabled: true, account_id: null,
-        },
-
-        // --- Init ---
+        // --- Init (Alpine calls this automatically — do NOT also use x-init) ---
         async init() {
             if (this.darkMode) document.documentElement.classList.add('dark');
-            window.addEventListener('keydown', (e) => this.handleKeydown(e));
+            if (!this._listenerAttached) {
+                window.addEventListener('keydown', (e) => this.handleKeydown(e));
+                this._listenerAttached = true;
+            }
+
             await this.checkHealth();
-            await this.loadAccounts();
-            await this.loadEmails();
-            await this.loadAiProviders();
-            await this.loadAiConfigs();
-            await this.loadTriggerTypes();
-            await this.loadActionTypes();
-            await this.loadAutomationRules();
-            await this.loadScheduledJobs();
+            // Independent loads in parallel — sequential awaits doubled startup time
+            await Promise.all([
+                this.loadAccounts(),
+                this.loadEmails(),
+                this.loadUnreadCount(),
+                this.loadAiProviders(),
+                this.loadAiConfigs(),
+                this.loadTriggerTypes(),
+                this.loadActionTypes(),
+                this.loadAutomationRules(),
+            ]);
             this.loading = false;
 
             this.$watch('page', (val) => {
@@ -129,6 +149,23 @@ document.addEventListener('alpine:init', () => {
                 document.documentElement.classList.toggle('dark', val);
                 localStorage.setItem('commhub-dark', val);
             });
+            this.$watch('searchQuery', () => {
+                clearTimeout(this._searchTimer);
+                this._searchTimer = setTimeout(() => {
+                    this.currentPage = 1;
+                    this.loadEmails();
+                }, 300);
+            });
+        },
+
+        // --- Toasts ---
+        toast(message, type = 'info') {
+            const id = ++this._toastId;
+            this.toasts.push({ id, message, type });
+            setTimeout(() => this.dismissToast(id), 4000);
+        },
+        dismissToast(id) {
+            this.toasts = this.toasts.filter(t => t.id !== id);
         },
 
         async checkHealth() {
@@ -136,28 +173,36 @@ document.addEventListener('alpine:init', () => {
                 const res = await fetch('/api/health');
                 this.health = await res.json();
             } catch (e) {
-                this.error = 'Failed to connect to backend';
+                this.toast('Cannot connect to the CommHub backend', 'error');
             }
         },
 
         navigate(pageId) {
             this.page = pageId;
             this.selectedEmail = null;
+            this.sidebarOpen = false;
+            this.searchQuery = '';
+            this.searchFilter = 'all';
             if (pageId !== 'settings') this.closeAiForm();
             if (pageId !== 'automation') this.closeRuleForm();
-            if (pageId !== 'inbox' && pageId !== 'sent' && pageId !== 'drafts' && pageId !== 'starred') this.composeOpen = false;
-            if (['inbox', 'sent', 'drafts', 'starred'].includes(pageId)) {
+            if (!this.isMailPage) this.composeOpen = false;
+            if (this.isMailPage) {
                 this.currentFolder = pageId === 'starred' ? 'STARRED' : pageId.toUpperCase();
                 this.currentPage = 1;
                 this.loadEmails();
             }
         },
 
+        // --- Keyboard shortcuts ---
         handleKeydown(e) {
+            // Never hijack browser/system shortcuts (Ctrl+C, Cmd+R, ...)
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
             const tag = e.target.tagName;
-            const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+            const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable;
 
             if (e.key === 'Escape') {
+                if (this.confirmDelete) { this.confirmDelete = null; return; }
                 if (this.shortcutsOpen) { this.shortcutsOpen = false; return; }
                 if (this.composeOpen) { this.closeCompose(); return; }
                 if (this.eventFormOpen) { this.closeEventForm(); return; }
@@ -168,46 +213,39 @@ document.addEventListener('alpine:init', () => {
 
             if (isInput) return;
 
-            if (e.key === '?') {
-                e.preventDefault();
-                this.shortcutsOpen = !this.shortcutsOpen;
-                return;
-            }
-
-            if (e.key === '/') {
-                e.preventDefault();
-                const search = document.querySelector('input[placeholder*="Search"]');
-                if (search) search.focus();
-                return;
-            }
-
-            if (e.key === 'c') {
-                if (['inbox','sent','drafts','starred'].includes(this.page)) {
+            switch (e.key) {
+                case '?':
                     e.preventDefault();
-                    this.openCompose();
+                    this.shortcutsOpen = !this.shortcutsOpen;
+                    break;
+                case '/':
+                    e.preventDefault();
+                    this.focusSearch();
+                    break;
+                case 'c':
+                    if (this.isMailPage) { e.preventDefault(); this.openCompose(); }
+                    break;
+                case 'r':
+                    if (this.selectedEmail) { e.preventDefault(); this.replyToSelected(); }
+                    break;
+                case 'j':
+                case 'ArrowDown':
+                    if (this.isMailPage) { e.preventDefault(); this.navigateEmail(1); }
+                    break;
+                case 'k':
+                case 'ArrowUp':
+                    if (this.isMailPage) { e.preventDefault(); this.navigateEmail(-1); }
+                    break;
+            }
+        },
+
+        focusSearch() {
+            this.$nextTick(() => {
+                const inputs = document.querySelectorAll('input[type="search"]');
+                for (const el of inputs) {
+                    if (el.offsetParent !== null) { el.focus(); return; }
                 }
-                return;
-            }
-
-            if (e.key === 'r' && this.selectedEmail) {
-                e.preventDefault();
-                this.openCompose();
-                this.composeForm.to = this.selectedEmail.from_address;
-                this.composeForm.subject = 'Re: ' + this.selectedEmail.subject;
-                return;
-            }
-
-            if ((e.key === 'j' || e.key === 'ArrowDown') && ['inbox','sent','drafts','starred'].includes(this.page)) {
-                e.preventDefault();
-                this.navigateEmail(1);
-                return;
-            }
-
-            if ((e.key === 'k' || e.key === 'ArrowUp') && ['inbox','sent','drafts','starred'].includes(this.page)) {
-                e.preventDefault();
-                this.navigateEmail(-1);
-                return;
-            }
+            });
         },
 
         navigateEmail(direction) {
@@ -220,6 +258,182 @@ document.addEventListener('alpine:init', () => {
             this.selectEmail(list[idx]);
         },
 
+        // --- Accounts ---
+        async loadAccounts() {
+            try {
+                const res = await fetch('/api/accounts');
+                if (res.ok) this.accounts = await res.json();
+            } catch (e) { /* surfaced via seed CTA if empty */ }
+        },
+
+        // --- Emails ---
+        async loadEmails() {
+            const reqId = ++this._emailReq;
+            this.emailsLoading = true;
+            try {
+                const params = new URLSearchParams({
+                    folder: this.currentFolder,
+                    page: this.currentPage,
+                    page_size: this.pageSize,
+                });
+                if (this.searchQuery.trim()) params.set('q', this.searchQuery.trim());
+                const res = await fetch(`/api/emails?${params}`);
+                if (reqId !== this._emailReq) return; // stale response — a newer request superseded this one
+                if (res.ok) {
+                    this.emails = await res.json();
+                    this.totalEmails = parseInt(res.headers.get('X-Total-Count') || '0');
+                } else {
+                    this.toast('Failed to load emails', 'error');
+                }
+            } catch (e) {
+                if (reqId === this._emailReq) this.toast('Network error loading emails', 'error');
+            } finally {
+                if (reqId === this._emailReq) this.emailsLoading = false;
+            }
+        },
+
+        async loadUnreadCount() {
+            try {
+                const res = await fetch('/api/emails/unread-count');
+                if (res.ok) this.unreadTotal = (await res.json()).unread;
+            } catch (e) {}
+        },
+
+        async selectEmail(email) {
+            this.selectedEmail = email;
+            if (!email.is_read) {
+                try {
+                    const res = await fetch(`/api/emails/${email.id}/mark-read`, { method: 'POST' });
+                    if (res.ok) {
+                        email.is_read = true;
+                        this.loadUnreadCount();
+                    }
+                } catch (e) {}
+            }
+        },
+
+        toggleDarkMode() { this.darkMode = !this.darkMode; },
+        closeEmailDetail() { this.selectedEmail = null; },
+
+        async toggleStar(email) {
+            try {
+                const res = await fetch(`/api/emails/${email.id}/toggle-star`, { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    email.is_starred = data.is_starred;
+                    if (this.selectedEmail?.id === email.id) this.selectedEmail.is_starred = data.is_starred;
+                } else {
+                    this.toast('Failed to update star', 'error');
+                }
+            } catch (e) { this.toast('Network error', 'error'); }
+        },
+
+        requestDelete(type, id, label) {
+            this.confirmDelete = { type, id, label };
+        },
+
+        async executeDelete() {
+            const { type, id } = this.confirmDelete || {};
+            this.confirmDelete = null;
+            if (type === 'email') await this.deleteEmail(id);
+            else if (type === 'event') await this.deleteEvent(id);
+            else if (type === 'rule') await this.deleteRule(id);
+            else if (type === 'aiConfig') await this.deleteAiConfig(id);
+        },
+
+        async deleteEmail(emailId) {
+            try {
+                const res = await fetch(`/api/emails/${emailId}`, { method: 'DELETE' });
+                if (res.ok) {
+                    this.emails = this.emails.filter(e => e.id !== emailId);
+                    this.totalEmails = Math.max(0, this.totalEmails - 1);
+                    if (this.selectedEmail?.id === emailId) this.selectedEmail = null;
+                    this.loadUnreadCount();
+                    this.toast('Email deleted', 'success');
+                } else {
+                    this.toast('Failed to delete email', 'error');
+                }
+            } catch (e) { this.toast('Network error deleting email', 'error'); }
+        },
+
+        openCompose(prefill = {}) {
+            this.composeForm = {
+                account_id: this.accounts[0]?.id ?? null,
+                to: prefill.to || '',
+                subject: prefill.subject || '',
+                body: prefill.body || '',
+            };
+            this.composeOpen = true;
+            this.$nextTick(() => document.getElementById('compose-to')?.focus());
+        },
+
+        replyToSelected() {
+            if (!this.selectedEmail) return;
+            const subj = this.selectedEmail.subject || '';
+            this.openCompose({
+                to: this.selectedEmail.from_address,
+                subject: subj.startsWith('Re: ') ? subj : `Re: ${subj}`,
+            });
+        },
+
+        closeCompose(force = false) {
+            const dirty = this.composeForm.to || this.composeForm.subject || this.composeForm.body;
+            if (dirty && !force) {
+                if (!window.confirm('Discard this draft?')) return;
+            }
+            this.composeOpen = false;
+        },
+
+        async sendEmail() {
+            if (this.sending) return;
+            if (!this.composeForm.to.trim()) { this.toast('Add a recipient first', 'error'); return; }
+            if (!this.composeForm.account_id) { this.toast('No account available — seed demo data first', 'error'); return; }
+            this.sending = true;
+            try {
+                const res = await fetch('/api/emails/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.composeForm),
+                });
+                if (res.ok) {
+                    this.composeOpen = false;
+                    this.toast('Email sent', 'success');
+                    this.navigate('sent');
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast(err.detail || 'Failed to send email', 'error');
+                }
+            } catch (e) {
+                this.toast('Network error sending email', 'error');
+            } finally {
+                this.sending = false;
+            }
+        },
+
+        async saveDraft() {
+            if (this.sending) return;
+            if (!this.composeForm.account_id) { this.toast('No account available — seed demo data first', 'error'); return; }
+            this.sending = true;
+            try {
+                const res = await fetch('/api/emails/draft', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.composeForm),
+                });
+                if (res.ok) {
+                    this.composeOpen = false;
+                    this.toast('Draft saved', 'success');
+                    this.navigate('drafts');
+                } else {
+                    this.toast('Failed to save draft', 'error');
+                }
+            } catch (e) {
+                this.toast('Network error saving draft', 'error');
+            } finally {
+                this.sending = false;
+            }
+        },
+
         nextPage() {
             if (this.currentPage < this.totalPages) {
                 this.currentPage++;
@@ -227,7 +441,6 @@ document.addEventListener('alpine:init', () => {
                 this.loadEmails();
             }
         },
-
         prevPage() {
             if (this.currentPage > 1) {
                 this.currentPage--;
@@ -236,129 +449,19 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        // --- Accounts ---
-        async loadAccounts() {
-            try {
-                const res = await fetch('/api/ai/configs');
-                if (res.ok) {
-                    // fallback: seed creates accounts, we'll just track via API
-                }
-                // Load from seed accounts — just for display
-                const h = await fetch('/api/health');
-                if (h.ok) this.accounts = [{ id: 1, email: 'nikot@work.com' }, { id: 2, email: 'nikot@personal.com' }];
-            } catch (e) {}
-        },
-
-        // --- Emails ---
-        async loadEmails() {
-            try {
-                const folder = this.currentFolder === 'STARRED' ? 'STARRED' : this.currentFolder;
-                const res = await fetch(`/api/emails?folder=${folder}&page=${this.currentPage}&page_size=${this.pageSize}`);
-                if (res.ok) {
-                    this.emails = await res.json();
-                    this.totalEmails = parseInt(res.headers.get('X-Total-Count') || '0');
-                }
-            } catch (e) {}
-        },
-
-        async selectEmail(email) {
-            try {
-                const res = await fetch(`/api/emails/${email.id}`);
-                if (res.ok) {
-                    this.selectedEmail = await res.json();
-                    // Update read status in list
-                    const idx = this.emails.findIndex(e => e.id === email.id);
-                    if (idx >= 0) this.emails[idx].is_read = true;
-                }
-            } catch (e) {}
-        },
-
-        toggleDarkMode() {
-            this.darkMode = !this.darkMode;
-        },
-        closeEmailDetail() {
-            this.selectedEmail = null;
-        },
-
-        async toggleStar(email) {
-            try {
-                const res = await fetch(`/api/emails/${email.id}/toggle-star`, { method: 'POST' });
-                if (res.ok) {
-                    const data = await res.json();
-                    email.is_starred = data.is_starred;
-                    if (this.selectedEmail && this.selectedEmail.id === email.id) {
-                        this.selectedEmail.is_starred = data.is_starred;
-                    }
-                }
-            } catch (e) {}
-        },
-
-        async toggleRead(email) {
-            try {
-                const res = await fetch(`/api/emails/${email.id}/toggle-read`, { method: 'POST' });
-                if (res.ok) {
-                    const data = await res.json();
-                    email.is_read = data.is_read;
-                }
-            } catch (e) {}
-        },
-
-        async deleteEmail(emailId) {
-            try {
-                const res = await fetch(`/api/emails/${emailId}`, { method: 'DELETE' });
-                if (res.ok) {
-                    this.emails = this.emails.filter(e => e.id !== emailId);
-                    if (this.selectedEmail && this.selectedEmail.id === emailId) this.selectedEmail = null;
-                }
-            } catch (e) {}
-        },
-
-        openCompose() {
-            this.composeForm = { account_id: this.accounts[0]?.id || 1, to: '', subject: '', body: '' };
-            this.composeOpen = true;
-        },
-
-        closeCompose() {
-            this.composeOpen = false;
-        },
-
-        async sendEmail() {
-            try {
-                const res = await fetch('/api/emails/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(this.composeForm),
-                });
-                if (res.ok) {
-                    this.closeCompose();
-                    this.navigate('sent');
-                }
-            } catch (e) {}
-        },
-
-        async saveDraft() {
-            try {
-                const res = await fetch('/api/emails/draft', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...this.composeForm, to: this.composeForm.to || 'draft@local' }),
-                });
-                if (res.ok) {
-                    this.closeCompose();
-                    this.navigate('drafts');
-                }
-            } catch (e) {}
-        },
-
         async seedData() {
             try {
                 const res = await fetch('/api/seed', { method: 'POST' });
                 if (res.ok) {
-                    await this.loadEmails();
                     this.currentFolder = 'INBOX';
                     this.page = 'inbox';
+                    this.currentPage = 1;
+                    await Promise.all([this.loadEmails(), this.loadAccounts(), this.loadUnreadCount()]);
+                    this.toast('Demo data loaded', 'success');
+                } else {
+                    this.toast('Failed to seed demo data', 'error');
                 }
-            } catch (e) {}
+            } catch (e) { this.toast('Network error seeding data', 'error'); }
         },
 
         // --- Calendar ---
@@ -366,7 +469,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 const now = new Date();
                 const start = new Date(now);
-                start.setDate(start.getDate() - start.getDay());
+                start.setDate(start.getDate() - start.getDay() + this.calendarOffsetWeeks * 7);
                 start.setHours(0, 0, 0, 0);
                 const end = new Date(start);
                 end.setDate(end.getDate() + 7);
@@ -376,8 +479,8 @@ document.addEventListener('alpine:init', () => {
 
                 const res = await fetch(`/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}`);
                 if (res.ok) this.events = await res.json();
+                else { this.toast('Failed to load calendar', 'error'); return; }
 
-                // Build day grid
                 this.calendarDays = [];
                 for (let i = 0; i < 7; i++) {
                     const d = new Date(start);
@@ -388,8 +491,12 @@ document.addEventListener('alpine:init', () => {
                     });
                     this.calendarDays.push({ date: d, events: dayEvents });
                 }
-            } catch (e) {}
+            } catch (e) { this.toast('Network error loading calendar', 'error'); }
         },
+
+        calendarPrevWeek() { this.calendarOffsetWeeks--; this.loadCalendarEvents(); },
+        calendarNextWeek() { this.calendarOffsetWeeks++; this.loadCalendarEvents(); },
+        calendarToday() { this.calendarOffsetWeeks = 0; this.loadCalendarEvents(); },
 
         calendarWeekLabel() {
             if (!this.calendarDays.length) return '';
@@ -398,9 +505,7 @@ document.addEventListener('alpine:init', () => {
             return `${s.toLocaleDateString([], { month: 'short', day: 'numeric' })} — ${e.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`;
         },
 
-        isToday(date) {
-            return date.toDateString() === new Date().toDateString();
-        },
+        isToday(date) { return date.toDateString() === new Date().toDateString(); },
 
         openNewEvent(day) {
             const d = new Date(day.date);
@@ -415,6 +520,7 @@ document.addEventListener('alpine:init', () => {
             };
             this.editingEventId = null;
             this.eventFormOpen = true;
+            this.$nextTick(() => document.getElementById('event-title')?.focus());
         },
 
         editEvent(evt) {
@@ -440,9 +546,11 @@ document.addEventListener('alpine:init', () => {
         },
 
         async saveEvent() {
+            if (!this.eventForm.title.trim()) { this.toast('Event needs a title', 'error'); return; }
             try {
                 const payload = {
                     ...this.eventForm,
+                    account_id: this.accounts[0]?.id ?? 1,
                     start_time: new Date(this.eventForm.start_time).toISOString(),
                     end_time: new Date(this.eventForm.end_time).toISOString(),
                 };
@@ -457,8 +565,12 @@ document.addEventListener('alpine:init', () => {
                 if (res.ok) {
                     this.closeEventForm();
                     await this.loadCalendarEvents();
+                    this.toast(this.editingEventId ? 'Event updated' : 'Event created', 'success');
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast(err.detail || 'Failed to save event', 'error');
                 }
-            } catch (e) {}
+            } catch (e) { this.toast('Network error saving event', 'error'); }
         },
 
         async deleteEvent(evtId) {
@@ -467,8 +579,11 @@ document.addEventListener('alpine:init', () => {
                 if (res.ok) {
                     if (this.editingEventId === evtId) this.closeEventForm();
                     await this.loadCalendarEvents();
+                    this.toast('Event deleted', 'success');
+                } else {
+                    this.toast('Failed to delete event', 'error');
                 }
-            } catch (e) {}
+            } catch (e) { this.toast('Network error deleting event', 'error'); }
         },
 
         // --- AI ---
@@ -493,19 +608,24 @@ document.addEventListener('alpine:init', () => {
             };
             this.aiFormEdit = false;
             this.aiFormOpen = true;
+            this.aiFormError = '';
         },
         editAiConfig(cfg) {
             this.aiForm = {
                 provider_type: cfg.provider_type, display_name: cfg.display_name,
-                api_key: cfg.api_key, base_url: cfg.base_url || '',
+                api_key: '', // never round-trip the secret; blank = keep existing
+                base_url: cfg.base_url || '',
                 model: cfg.model, temperature: cfg.temperature, max_tokens: cfg.max_tokens,
             };
             this.aiFormEdit = true;
             this.aiFormOpen = true;
+            this.aiFormError = '';
         },
-        closeAiForm() { this.aiFormOpen = false; this.aiFormEdit = false; },
+        closeAiForm() { this.aiFormOpen = false; this.aiFormEdit = false; this.aiFormError = ''; },
         async saveAiConfig() {
-            this.aiError = '';
+            if (this.aiFormSaving) return;
+            this.aiFormError = '';
+            this.aiFormSaving = true;
             try {
                 const url = this.aiFormEdit ? `/api/ai/configs/${this.aiForm.provider_type}` : '/api/ai/configs';
                 const method = this.aiFormEdit ? 'PUT' : 'POST';
@@ -513,10 +633,16 @@ document.addEventListener('alpine:init', () => {
                     method, headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(this.aiForm),
                 });
-                if (!res.ok) { const err = await res.json(); this.aiError = err.detail || 'Failed to save'; return; }
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    this.aiFormError = err.detail || 'Failed to save';
+                    return;
+                }
                 this.closeAiForm();
                 await this.loadAiConfigs();
-            } catch (e) { this.aiError = 'Network error saving config'; }
+                this.toast('AI provider saved', 'success');
+            } catch (e) { this.aiFormError = 'Network error saving config'; }
+            finally { this.aiFormSaving = false; }
         },
         async activateAiProvider(providerType) {
             try {
@@ -524,19 +650,26 @@ document.addEventListener('alpine:init', () => {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ is_active: true }),
                 });
-                if (res.ok) await this.loadAiConfigs();
-            } catch (e) {}
+                if (res.ok) {
+                    await this.loadAiConfigs();
+                    this.toast(`${providerType} is now the active provider`, 'success');
+                }
+            } catch (e) { this.toast('Failed to activate provider', 'error'); }
         },
         async deleteAiConfig(providerType) {
             try {
                 const res = await fetch(`/api/ai/configs/${providerType}`, { method: 'DELETE' });
-                if (res.ok) await this.loadAiConfigs();
-            } catch (e) {}
+                if (res.ok) {
+                    await this.loadAiConfigs();
+                    this.toast('Provider removed', 'success');
+                } else {
+                    this.toast('Failed to remove provider', 'error');
+                }
+            } catch (e) { this.toast('Network error', 'error'); }
         },
         async aiAction(action) {
-            if (!this.aiInput.trim()) return;
-            this.aiLoading = true; this.aiResult = ''; this.aiError = '';
-            this.aiToneSelector = action === 'draft';
+            if (!this.aiInput.trim() || this.aiLoading) return;
+            this.aiLoading = true; this.aiResult = ''; this.aiError = ''; this.aiCopied = false;
             try {
                 let res;
                 const opts = (body) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -544,21 +677,39 @@ document.addEventListener('alpine:init', () => {
                 else if (action === 'summarize') res = await fetch('/api/ai/summarize', opts({ email_text: this.aiInput }));
                 else if (action === 'categorize') res = await fetch('/api/ai/categorize', opts({ subject: '', body: this.aiInput }));
                 else if (action === 'chat') res = await fetch('/api/ai/chat', opts({ prompt: this.aiInput }));
-                if (res && res.ok) { const d = await res.json(); this.aiResult = d.result; this.aiResultProvider = `${d.provider} (${d.model})`; }
-                else if (res) { const err = await res.json(); this.aiError = err.detail || 'AI request failed'; }
+                if (res && res.ok) {
+                    const d = await res.json();
+                    this.aiResult = d.result;
+                    this.aiResultProvider = `${d.provider} (${d.model})`;
+                } else if (res) {
+                    const err = await res.json().catch(() => ({}));
+                    this.aiError = err.detail || 'AI request failed';
+                }
             } catch (e) { this.aiError = 'Network error during AI request'; }
             finally { this.aiLoading = false; }
         },
-        copyAiResult() { navigator.clipboard?.writeText(this.aiResult); },
+        async copyAiResult() {
+            try {
+                await navigator.clipboard.writeText(this.aiResult);
+                this.aiCopied = true;
+                setTimeout(() => this.aiCopied = false, 2000);
+            } catch (e) { this.toast('Clipboard unavailable', 'error'); }
+        },
 
         // --- Automation ---
-        async loadAutomationRules() { try { const r = await fetch('/api/automation/rules'); if (r.ok) this.automationRules = await r.json(); } catch (e) {} },
-        async loadTriggerTypes() { try { const r = await fetch('/api/automation/trigger-types'); if (r.ok) this.triggerTypes = await r.json(); } catch (e) {} },
-        async loadActionTypes() { try { const r = await fetch('/api/automation/action-types'); if (r.ok) this.actionTypes = await r.json(); } catch (e) {} },
-        async loadScheduledJobs() { try { const r = await fetch('/api/automation/scheduler/jobs'); if (r.ok) this.scheduledJobs = await r.json(); } catch (e) {} },
+        async loadAutomationRules() {
+            try { const r = await fetch('/api/automation/rules'); if (r.ok) this.automationRules = await r.json(); } catch (e) {}
+        },
+        async loadTriggerTypes() {
+            try { const r = await fetch('/api/automation/trigger-types'); if (r.ok) this.triggerTypes = await r.json(); } catch (e) {}
+        },
+        async loadActionTypes() {
+            try { const r = await fetch('/api/automation/action-types'); if (r.ok) this.actionTypes = await r.json(); } catch (e) {}
+        },
         openNewRule() {
             this.ruleForm = { name: '', description: '', trigger_type: 'new_email', trigger_config: {}, action_type: 'auto_reply', action_config: {}, cron_schedule: '', is_enabled: true, account_id: null };
-            this.ruleFormEdit = false; this.ruleFormOpen = true;
+            this.ruleFormEdit = false; this.ruleFormEditId = null; this.ruleFormOpen = true;
+            this.$nextTick(() => document.getElementById('rule-name')?.focus());
         },
         editRule(rule) {
             this.ruleForm = { name: rule.name, description: rule.description || '', trigger_type: rule.trigger_type, trigger_config: rule.trigger_config || {}, action_type: rule.action_type, action_config: rule.action_config || {}, cron_schedule: rule.cron_schedule || '', is_enabled: rule.is_enabled, account_id: rule.account_id };
@@ -566,19 +717,48 @@ document.addEventListener('alpine:init', () => {
         },
         closeRuleForm() { this.ruleFormOpen = false; this.ruleFormEdit = false; this.ruleFormEditId = null; },
         async saveRule() {
+            if (this.ruleFormSaving) return;
+            if (!this.ruleForm.name.trim()) { this.toast('Rule needs a name', 'error'); return; }
+            this.ruleFormSaving = true;
             try {
                 const payload = { ...this.ruleForm };
                 if (!payload.cron_schedule) payload.cron_schedule = null;
                 const url = this.ruleFormEdit ? `/api/automation/rules/${this.ruleFormEditId}` : '/api/automation/rules';
                 const method = this.ruleFormEdit ? 'PUT' : 'POST';
                 const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (res.ok) { this.closeRuleForm(); await this.loadAutomationRules(); await this.loadScheduledJobs(); }
-            } catch (e) {}
+                if (res.ok) {
+                    this.closeRuleForm();
+                    await this.loadAutomationRules();
+                    this.toast(this.ruleFormEdit ? 'Rule updated' : 'Rule created', 'success');
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast(err.detail || 'Failed to save rule', 'error');
+                }
+            } catch (e) { this.toast('Network error saving rule', 'error'); }
+            finally { this.ruleFormSaving = false; }
         },
-        async deleteRule(ruleId) { try { const r = await fetch(`/api/automation/rules/${ruleId}`, { method: 'DELETE' }); if (r.ok) { await this.loadAutomationRules(); await this.loadScheduledJobs(); } } catch (e) {} },
-        async toggleRule(ruleId) { try { const r = await fetch(`/api/automation/rules/${ruleId}/toggle`, { method: 'POST' }); if (r.ok) { await this.loadAutomationRules(); await this.loadScheduledJobs(); } } catch (e) {} },
-        triggerTypeLabel(type) { const l = { new_email: '📩 New Email', keyword_match: '🔑 Keyword Match', cron_schedule: '⏰ Cron Schedule' }; return l[type] || type; },
-        actionTypeLabel(type) { const l = { auto_reply: '✉️ Auto-Reply', categorize: '🏷️ Categorize', mark_read: '✔️ Mark Read', star: '⭐ Star', forward: '📤 Forward' }; return l[type] || type; },
+        async deleteRule(ruleId) {
+            try {
+                const r = await fetch(`/api/automation/rules/${ruleId}`, { method: 'DELETE' });
+                if (r.ok) { await this.loadAutomationRules(); this.toast('Rule deleted', 'success'); }
+                else this.toast('Failed to delete rule', 'error');
+            } catch (e) { this.toast('Network error', 'error'); }
+        },
+        async toggleRule(ruleId) {
+            try {
+                const r = await fetch(`/api/automation/rules/${ruleId}/toggle`, { method: 'POST' });
+                if (r.ok) await this.loadAutomationRules();
+                else this.toast('Failed to toggle rule', 'error');
+            } catch (e) { this.toast('Network error', 'error'); }
+        },
+        triggerTypeLabel(type) {
+            const l = { new_email: 'New Email', keyword_match: 'Keyword Match', cron_schedule: 'Cron Schedule' };
+            return l[type] || type;
+        },
+        actionTypeLabel(type) {
+            const l = { auto_reply: 'Auto-Reply', categorize: 'Categorize', mark_read: 'Mark Read', star: 'Star', forward: 'Forward' };
+            return l[type] || type;
+        },
 
         // --- Utils ---
         formatDate(dateStr) {
@@ -591,27 +771,33 @@ document.addEventListener('alpine:init', () => {
             return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
         },
         truncate(str, len) { return str && str.length > len ? str.slice(0, len) + '...' : str || ''; },
-        iconSVG(name) {
-            const icons = {
-                inbox: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>',
-                sent: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>',
-                draft: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>',
-                star: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
-                calendar: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>',
-                automation: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>',
-                settings: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
-                compose: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>',
-                search: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>',
-                moon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>',
-                sun: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>',
-                trash: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>',
-                reply: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>',
-                plus: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>',
-            };
-            return icons[name] || '';
+        initials(nameOrEmail) {
+            if (!nameOrEmail) return '?';
+            const name = nameOrEmail.split('@')[0];
+            const parts = name.split(/[\s._-]+/).filter(Boolean);
+            if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+            return name.slice(0, 2).toUpperCase();
+        },
+        avatarColor(str) {
+            const colors = ['bg-blue-600', 'bg-indigo-600', 'bg-violet-600', 'bg-emerald-600', 'bg-rose-600', 'bg-amber-600', 'bg-cyan-600', 'bg-fuchsia-600'];
+            let hash = 0;
+            for (let i = 0; i < (str || '').length; i++) hash = (hash * 31 + str.charCodeAt(i)) | 0;
+            return colors[Math.abs(hash) % colors.length];
         },
         dayName(d) { return d.toLocaleDateString([], { weekday: 'short' }); },
         dayNum(d) { return d.getDate(); },
-        hourLabel(d) { return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); },
+
+        iconSVG(name) {
+            const icons = {
+                inbox: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>',
+                sent: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>',
+                draft: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>',
+                star: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+                calendar: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>',
+                automation: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>',
+                settings: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
+            };
+            return icons[name] || '';
+        },
     }));
 });
