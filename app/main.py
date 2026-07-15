@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.database import init_db, async_session_factory
 from app.models import AutomationRule
-from app.routers import health, ai, automation
+from app.routers import health, ai, automation, emails, calendar
 from app.automation.scheduler import start_scheduler, stop_scheduler, add_cron_job
 from app.automation.engine import execute_cron_rule
 
@@ -16,7 +16,6 @@ async def lifespan(app: FastAPI):
     await init_db()
     await start_scheduler()
 
-    # Load existing cron rules
     async with async_session_factory() as session:
         result = await session.execute(
             select(AutomationRule).where(
@@ -37,6 +36,15 @@ app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=li
 app.include_router(health.router)
 app.include_router(ai.router)
 app.include_router(automation.router)
+app.include_router(emails.router)
+app.include_router(calendar.router)
+
+
+@app.post("/api/seed")
+async def seed_demo_data():
+    from app.mock_data import seed_demo_data as _seed
+    return await _seed()
+
 
 static_dir = Path(__file__).parent / "static"
 app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
