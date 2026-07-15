@@ -41,6 +41,10 @@ class SaveDraftRequest(BaseModel):
     body: str = ""
 
 
+class MoveEmailRequest(BaseModel):
+    folder: str
+
+
 def _utcnow() -> datetime.datetime:
     return datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
 
@@ -221,6 +225,22 @@ async def toggle_star(email_id: int, db: AsyncSession = Depends(get_db)):
     email.is_starred = not email.is_starred
     await db.commit()
     return {"id": email.id, "is_starred": email.is_starred}
+
+
+@router.post("/{email_id}/move")
+async def move_email(email_id: int, req: MoveEmailRequest, db: AsyncSession = Depends(get_db)):
+    folder = req.folder.upper().strip()
+    if folder not in FOLDERS:
+        raise HTTPException(400, f"Unknown folder '{folder}'. Must be one of: {FOLDERS}")
+    result = await db.execute(select(Email).where(Email.id == email_id))
+    email = result.scalar_one_or_none()
+    if not email:
+        raise HTTPException(404, "Email not found")
+    email.folder = folder
+    if folder == "INBOX":
+        email.is_read = False
+    await db.commit()
+    return {"id": email.id, "folder": folder}
 
 
 @router.delete("/{email_id}")

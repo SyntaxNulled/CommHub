@@ -47,12 +47,18 @@ document.addEventListener('alpine:init', () => {
 
         // --- Calendar State ---
         events: [],
-        calendarDays: [],
-        calendarWeekStart: null,
-        calendarOffsetWeeks: 0,
+        calendarView: 'week', // 'day' | 'week' | 'month' | 'agenda'
+        calendarOffsetDays: 0, // for day/week view (in days)
+        calendarOffsetMonths: 0, // for month view
+        calendarCategories: [],
+        selectedEvent: null, // read-only detail panel
         eventFormOpen: false,
-        eventForm: { title: '', description: '', start_time: '', end_time: '', is_all_day: false },
+        eventForm: { title: '', description: '', start_time: '', end_time: '', is_all_day: false, category: 'other' },
         editingEventId: null,
+        miniCalendarDate: new Date(),
+        calendarFilter: 'all', // category filter
+        calendarLoading: false,
+        _calendarReq: 0,
 
         // --- AI State ---
         aiPanelOpen: false,
@@ -70,11 +76,17 @@ document.addEventListener('alpine:init', () => {
         aiFormOpen: false,
         aiFormEdit: false,
         aiForm: {
-            provider_type: '', display_name: '', api_key: '', base_url: '',
+            id: null, provider_type: '', display_name: '', api_key: '', base_url: '',
             model: '', temperature: 0.7, max_tokens: 1024,
         },
         aiFormError: '',
         aiFormSaving: false,
+
+        // AI Organization
+        aiOrganizeOpen: false,
+        aiOrganizeLoading: false,
+        aiOrganizeSuggestions: [],
+        aiOrganizeApplyAll: [],
 
         // --- Automation State ---
         automationRules: [],
@@ -102,8 +114,11 @@ document.addEventListener('alpine:init', () => {
             return Math.max(1, Math.ceil(this.totalEmails / this.pageSize));
         },
         get unconfiguredProviders() {
-            const configured = this.aiConfigs.map(c => c.provider_type);
-            return this.availableProviders.filter(p => !configured.includes(p));
+            // Built-in providers are only addable once; custom can be added repeatedly
+            const configuredBuiltins = this.aiConfigs
+                .filter(c => c.provider_type !== 'custom')
+                .map(c => c.provider_type);
+            return this.availableProviders.filter(p => p !== 'custom' && !configuredBuiltins.includes(p));
         },
         get aiActiveLabel() {
             const active = this.aiConfigs.find(c => c.is_active);
@@ -118,6 +133,12 @@ document.addEventListener('alpine:init', () => {
         },
         get isMailPage() {
             return ['inbox', 'sent', 'drafts', 'starred'].includes(this.page);
+        },
+        get calendarEventColor() {
+            return (category) => {
+                const cat = this.calendarCategories.find(c => c.name === category);
+                return cat?.color || '#3B82F6';
+            };
         },
 
         // --- Init (Alpine calls this automatically — do NOT also use x-init) ---
@@ -139,6 +160,7 @@ document.addEventListener('alpine:init', () => {
                 this.loadTriggerTypes(),
                 this.loadActionTypes(),
                 this.loadAutomationRules(),
+                this.loadCalendarCategories(),
             ]);
             this.loading = false;
 
@@ -183,6 +205,8 @@ document.addEventListener('alpine:init', () => {
             this.sidebarOpen = false;
             this.searchQuery = '';
             this.searchFilter = 'all';
+            this.selectedEvent = null;
+            this.aiOrganizeOpen = false;
             if (pageId !== 'settings') this.closeAiForm();
             if (pageId !== 'automation') this.closeRuleForm();
             if (!this.isMailPage) this.composeOpen = false;
@@ -206,7 +230,9 @@ document.addEventListener('alpine:init', () => {
                 if (this.shortcutsOpen) { this.shortcutsOpen = false; return; }
                 if (this.composeOpen) { this.closeCompose(); return; }
                 if (this.eventFormOpen) { this.closeEventForm(); return; }
+                if (this.aiOrganizeOpen) { this.aiOrganizeOpen = false; return; }
                 if (this.aiPanelOpen) { this.aiPanelOpen = false; return; }
+                if (this.selectedEvent) { this.selectedEvent = null; return; }
                 if (this.selectedEmail) { this.closeEmailDetail(); return; }
                 return;
             }
@@ -465,55 +491,158 @@ document.addEventListener('alpine:init', () => {
         },
 
         // --- Calendar ---
-        async loadCalendarEvents() {
+        async loadCalendarCategories() {
             try {
-                const now = new Date();
-                const start = new Date(now);
-                start.setDate(start.getDate() - start.getDay() + this.calendarOffsetWeeks * 7);
-                start.setHours(0, 0, 0, 0);
-                const end = new Date(start);
-                end.setDate(end.getDate() + 7);
-                end.setHours(23, 59, 59, 999);
-
-                this.calendarWeekStart = start;
-
-                const res = await fetch(`/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}`);
-                if (res.ok) this.events = await res.json();
-                else { this.toast('Failed to load calendar', 'error'); return; }
-
-                this.calendarDays = [];
-                for (let i = 0; i < 7; i++) {
-                    const d = new Date(start);
-                    d.setDate(d.getDate() + i);
-                    const dayEvents = this.events.filter(e => {
-                        const es = new Date(e.start_time);
-                        return es.toDateString() === d.toDateString();
-                    });
-                    this.calendarDays.push({ date: d, events: dayEvents });
-                }
-            } catch (e) { this.toast('Network error loading calendar', 'error'); }
+                const res = await fetch('/api/calendar/categories');
+                if (res.ok) this.calendarCategories = await res.json();
+            } catch (e) {}
         },
 
-        calendarPrevWeek() { this.calendarOffsetWeeks--; this.loadCalendarEvents(); },
-        calendarNextWeek() { this.calendarOffsetWeeks++; this.loadCalendarEvents(); },
-        calendarToday() { this.calendarOffsetWeeks = 0; this.loadCalendarEvents(); },
+        _calendarRange() {
+            const now = new Date();
+            const start = new Date(now);
+            const end = new Date(start);
+            if (this.calendarView === 'day') {
+                start.setDate(start.getDate() + this.calendarOffsetDays);
+                start.setHours(0, 0, 0, 0);
+                end.setDate(end.getDate() + this.calendarOffsetDays);
+                end.setHours(23, 59, 59, 999);
+            } else if (this.calendarView === 'week') {
+                start.setDate(start.getDate() - start.getDay() + this.calendarOffsetDays);
+                start.setHours(0, 0, 0, 0);
+                end.setDate(start.getDate() + 7);
+                end.setHours(23, 59, 59, 999);
+            } else if (this.calendarView === 'month') {
+                const monthAnchor = new Date(start);
+                monthAnchor.setMonth(monthAnchor.getMonth() + this.calendarOffsetMonths);
+                monthAnchor.setDate(1);
+                start.setDate(1);
+                start.setMonth(monthAnchor.getMonth());
+                start.setFullYear(monthAnchor.getFullYear());
+                start.setDate(start.getDate() - start.getDay()); // Sunday before month start
+                start.setHours(0, 0, 0, 0);
+                end.setDate(start.getDate() + 42); // 6 weeks
+                end.setHours(23, 59, 59, 999);
+            } else { // agenda
+                start.setDate(start.getDate() + this.calendarOffsetDays);
+                start.setHours(0, 0, 0, 0);
+                end.setMonth(end.getMonth() + 1);
+                end.setHours(23, 59, 59, 999);
+            }
+            this.miniCalendarDate = new Date(start);
+            return { start, end };
+        },
 
-        calendarWeekLabel() {
-            if (!this.calendarDays.length) return '';
-            const s = this.calendarDays[0].date;
-            const e = this.calendarDays[6].date;
-            return `${s.toLocaleDateString([], { month: 'short', day: 'numeric' })} — ${e.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        async loadCalendarEvents() {
+            const reqId = ++this._calendarReq;
+            this.calendarLoading = true;
+            try {
+                const { start, end } = this._calendarRange();
+                const params = new URLSearchParams({
+                    start: start.toISOString(),
+                    end: end.toISOString(),
+                });
+                if (this.calendarFilter !== 'all') params.set('category', this.calendarFilter);
+                const res = await fetch(`/api/calendar/events?${params}`);
+                if (reqId !== this._calendarReq) return;
+                if (res.ok) this.events = await res.json();
+                else { this.toast('Failed to load calendar', 'error'); return; }
+            } catch (e) {
+                if (reqId === this._calendarReq) this.toast('Network error loading calendar', 'error');
+            } finally {
+                if (reqId === this._calendarReq) this.calendarLoading = false;
+            }
+        },
+
+        setCalendarView(view) {
+            this.calendarView = view;
+            this.calendarOffsetDays = 0;
+            this.calendarOffsetMonths = 0;
+            this.selectedEvent = null;
+            this.loadCalendarEvents();
+        },
+
+        calendarPrev() {
+            if (this.calendarView === 'month') this.calendarOffsetMonths--;
+            else this.calendarOffsetDays -= (this.calendarView === 'week' ? 7 : 1);
+            this.loadCalendarEvents();
+        },
+        calendarNext() {
+            if (this.calendarView === 'month') this.calendarOffsetMonths++;
+            else this.calendarOffsetDays += (this.calendarView === 'week' ? 7 : 1);
+            this.loadCalendarEvents();
+        },
+        calendarToday() {
+            this.calendarOffsetDays = 0;
+            this.calendarOffsetMonths = 0;
+            this.loadCalendarEvents();
+        },
+        calendarGoToDate(date) {
+            const now = new Date();
+            if (this.calendarView === 'month') {
+                const target = new Date(date);
+                this.calendarOffsetMonths = (target.getMonth() - now.getMonth()) + (target.getFullYear() - now.getFullYear()) * 12;
+                this.calendarOffsetDays = 0;
+            } else {
+                const diff = Math.floor((new Date(date).setHours(0,0,0,0) - now.setHours(0,0,0,0)) / 86400000);
+                this.calendarOffsetDays = diff;
+                this.calendarOffsetMonths = 0;
+            }
+            this.loadCalendarEvents();
+        },
+
+        calendarRangeLabel() {
+            const { start, end } = this._calendarRange();
+            if (this.calendarView === 'day') return start.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            if (this.calendarView === 'week') return `${start.toLocaleDateString([], { month: 'short', day: 'numeric' })} — ${end.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`;
+            if (this.calendarView === 'month') return start.toLocaleDateString([], { month: 'long', year: 'numeric' });
+            return `${start.toLocaleDateString([], { month: 'short', day: 'numeric' })} — ${end.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        },
+
+        calendarMonthDays() {
+            const { start, end } = this._calendarRange();
+            const days = [];
+            const d = new Date(start);
+            while (d < end) {
+                const dayEvents = this.events.filter(e => {
+                    const es = new Date(e.start_time);
+                    return es.toDateString() === d.toDateString();
+                });
+                days.push({ date: new Date(d), events: dayEvents });
+                d.setDate(d.getDate() + 1);
+            }
+            return days;
+        },
+
+        calendarDayHours() {
+            const hours = [];
+            for (let h = 0; h < 24; h++) hours.push({ hour: h, label: `${h}:00` });
+            return hours;
+        },
+
+        calendarDayEvents() {
+            const { start } = this._calendarRange();
+            return this.events.filter(e => {
+                const es = new Date(e.start_time);
+                return es.toDateString() === start.toDateString();
+            }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        },
+
+        calendarAgendaEvents() {
+            return [...this.events].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
         },
 
         isToday(date) { return date.toDateString() === new Date().toDateString(); },
+        isSameMonth(date) { return date.getMonth() === new Date().getMonth() && date.getFullYear() === new Date().getFullYear(); },
 
-        openNewEvent(day) {
-            const d = new Date(day.date);
-            d.setHours(10, 0, 0, 0);
+        openNewEvent(day, hour = 10) {
+            const d = day ? new Date(day.date) : new Date();
+            if (!day) d.setHours(hour, 0, 0, 0);
+            else d.setHours(hour, 0, 0, 0);
             const end = new Date(d);
-            end.setHours(11, 0, 0, 0);
+            end.setHours(end.getHours() + 1);
             this.eventForm = {
-                title: '', description: '',
+                title: '', description: '', category: 'other',
                 start_time: this.toLocalDatetime(d),
                 end_time: this.toLocalDatetime(end),
                 is_all_day: false,
@@ -525,13 +654,18 @@ document.addEventListener('alpine:init', () => {
 
         editEvent(evt) {
             this.eventForm = {
-                title: evt.title, description: evt.description || '',
+                title: evt.title, description: evt.description || '', category: evt.category || 'other',
                 start_time: this.toLocalDatetime(new Date(evt.start_time)),
                 end_time: this.toLocalDatetime(new Date(evt.end_time)),
                 is_all_day: evt.is_all_day,
             };
             this.editingEventId = evt.id;
             this.eventFormOpen = true;
+            this.selectedEvent = null;
+        },
+
+        viewEvent(evt) {
+            this.selectedEvent = evt;
         },
 
         closeEventForm() {
@@ -578,6 +712,7 @@ document.addEventListener('alpine:init', () => {
                 const res = await fetch(`/api/calendar/events/${evtId}`, { method: 'DELETE' });
                 if (res.ok) {
                     if (this.editingEventId === evtId) this.closeEventForm();
+                    if (this.selectedEvent?.id === evtId) this.selectedEvent = null;
                     await this.loadCalendarEvents();
                     this.toast('Event deleted', 'success');
                 } else {
@@ -600,9 +735,11 @@ document.addEventListener('alpine:init', () => {
             } catch (e) {}
         },
         openNewAiConfig(providerType) {
+            const isCustom = providerType === 'custom';
             this.aiForm = {
+                id: null,
                 provider_type: providerType,
-                display_name: providerType.charAt(0).toUpperCase() + providerType.slice(1),
+                display_name: isCustom ? '' : providerType.charAt(0).toUpperCase() + providerType.slice(1),
                 api_key: '', base_url: providerType === 'ollama' ? 'http://localhost:11434' : '',
                 model: '', temperature: 0.7, max_tokens: 1024,
             };
@@ -612,7 +749,7 @@ document.addEventListener('alpine:init', () => {
         },
         editAiConfig(cfg) {
             this.aiForm = {
-                provider_type: cfg.provider_type, display_name: cfg.display_name,
+                id: cfg.id, provider_type: cfg.provider_type, display_name: cfg.display_name,
                 api_key: '', // never round-trip the secret; blank = keep existing
                 base_url: cfg.base_url || '',
                 model: cfg.model, temperature: cfg.temperature, max_tokens: cfg.max_tokens,
@@ -624,14 +761,17 @@ document.addEventListener('alpine:init', () => {
         closeAiForm() { this.aiFormOpen = false; this.aiFormEdit = false; this.aiFormError = ''; },
         async saveAiConfig() {
             if (this.aiFormSaving) return;
+            if (!this.aiForm.display_name.trim()) { this.aiFormError = 'Display name is required'; return; }
             this.aiFormError = '';
             this.aiFormSaving = true;
             try {
-                const url = this.aiFormEdit ? `/api/ai/configs/${this.aiForm.provider_type}` : '/api/ai/configs';
+                const url = this.aiFormEdit ? `/api/ai/configs/${this.aiForm.id}` : '/api/ai/configs';
                 const method = this.aiFormEdit ? 'PUT' : 'POST';
+                const payload = { ...this.aiForm };
+                if (payload.id) delete payload.id;
                 const res = await fetch(url, {
                     method, headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(this.aiForm),
+                    body: JSON.stringify(payload),
                 });
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
@@ -644,21 +784,23 @@ document.addEventListener('alpine:init', () => {
             } catch (e) { this.aiFormError = 'Network error saving config'; }
             finally { this.aiFormSaving = false; }
         },
-        async activateAiProvider(providerType) {
+        async activateAiProvider(configId) {
             try {
-                const res = await fetch(`/api/ai/configs/${providerType}`, {
+                const res = await fetch(`/api/ai/configs/${configId}`, {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ is_active: true }),
                 });
                 if (res.ok) {
                     await this.loadAiConfigs();
-                    this.toast(`${providerType} is now the active provider`, 'success');
+                    this.toast('Provider is now active', 'success');
+                } else {
+                    this.toast('Failed to activate provider', 'error');
                 }
             } catch (e) { this.toast('Failed to activate provider', 'error'); }
         },
-        async deleteAiConfig(providerType) {
+        async deleteAiConfig(configId) {
             try {
-                const res = await fetch(`/api/ai/configs/${providerType}`, { method: 'DELETE' });
+                const res = await fetch(`/api/ai/configs/${configId}`, { method: 'DELETE' });
                 if (res.ok) {
                     await this.loadAiConfigs();
                     this.toast('Provider removed', 'success');
@@ -694,6 +836,57 @@ document.addEventListener('alpine:init', () => {
                 this.aiCopied = true;
                 setTimeout(() => this.aiCopied = false, 2000);
             } catch (e) { this.toast('Clipboard unavailable', 'error'); }
+        },
+
+        // AI Organization
+        openAiOrganize() {
+            this.aiOrganizeOpen = true;
+            this.aiOrganizeSuggestions = [];
+            this.aiOrganizeApplyAll = [];
+        },
+        closeAiOrganize() { this.aiOrganizeOpen = false; },
+        async aiOrganizeInbox() {
+            if (this.aiOrganizeLoading) return;
+            this.aiOrganizeLoading = true;
+            this.aiOrganizeSuggestions = [];
+            try {
+                const res = await fetch('/api/ai/organize', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder: 'INBOX', limit: 50 }),
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    this.aiOrganizeSuggestions = data.suggestions || [];
+                    this.aiOrganizeApplyAll = this.aiOrganizeSuggestions.map(s => s.email_id);
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast(err.detail || 'AI organization failed', 'error');
+                }
+            } catch (e) { this.toast('Network error during AI organization', 'error'); }
+            finally { this.aiOrganizeLoading = false; }
+        },
+        async aiApplySuggestion(emailId, folder) {
+            try {
+                const res = await fetch(`/api/emails/${emailId}/move`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder }),
+                });
+                if (res.ok) {
+                    this.aiOrganizeSuggestions = this.aiOrganizeSuggestions.filter(s => s.email_id !== emailId);
+                    this.aiOrganizeApplyAll = this.aiOrganizeApplyAll.filter(id => id !== emailId);
+                    this.toast('Email moved', 'success');
+                    if (this.currentFolder === 'INBOX') this.loadEmails();
+                    this.loadUnreadCount();
+                } else {
+                    this.toast('Failed to move email', 'error');
+                }
+            } catch (e) { this.toast('Network error', 'error'); }
+        },
+        async aiApplyAll() {
+            for (const id of this.aiOrganizeApplyAll) {
+                const s = this.aiOrganizeSuggestions.find(x => x.email_id === id);
+                if (s) await this.aiApplySuggestion(s.email_id, s.suggested_folder);
+            }
         },
 
         // --- Automation ---
@@ -770,6 +963,18 @@ document.addEventListener('alpine:init', () => {
             if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
             return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
         },
+        formatDateTime(dateStr) {
+            if (!dateStr) return '';
+            return new Date(dateStr).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        },
+        formatDateFull(dateStr) {
+            if (!dateStr) return '';
+            return new Date(dateStr).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        },
+        formatTime(dateStr) {
+            if (!dateStr) return '';
+            return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        },
         truncate(str, len) { return str && str.length > len ? str.slice(0, len) + '...' : str || ''; },
         initials(nameOrEmail) {
             if (!nameOrEmail) return '?';
@@ -786,6 +991,8 @@ document.addEventListener('alpine:init', () => {
         },
         dayName(d) { return d.toLocaleDateString([], { weekday: 'short' }); },
         dayNum(d) { return d.getDate(); },
+        monthYear(d) { return d.toLocaleDateString([], { month: 'long', year: 'numeric' }); },
+        weekdayLong(d) { return d.toLocaleDateString([], { weekday: 'long' }); },
 
         iconSVG(name) {
             const icons = {

@@ -79,7 +79,7 @@ tests/                  — 71 pytest tests across 5 test files
 - `pytest` with `pytest-asyncio` (strict mode)
 - Test client: `httpx.AsyncClient` with `ASGITransport`
 - Each test file uses `override_get_db` to inject a fresh in-memory SQLite DB per test
-- 71 tests, all passing. Run: `pytest -v`
+- 79 tests, all passing. Run: `pytest -v`
 
 ### Packaging
 - PyInstaller via `commhub.spec` (includes pystray/PIL hidden imports)
@@ -94,11 +94,13 @@ tests/                  — 71 pytest tests across 5 test files
 EmailAccount          — id, email, provider (gmail/outlook), display_name, is_active, oauth_token_json
 Email                 — id, account_id*, folder, from_address, to_addresses, subject, body_text,
                         is_read, is_starred*, received_at   (* indexed; composite folder+received_at)
-CalendarEvent         — id, account_id*, title, description, start_time*, end_time, is_all_day
+CalendarEvent         — id, account_id*, title, description, start_time*, end_time, is_all_day,
+                        category (work/personal/meeting/important/travel/birthday/reminder/other)
 AutomationRule        — id, name, trigger_type, trigger_config, action_type, action_config,
                         cron_schedule (validated), is_enabled, account_id (nullable)
-AIProviderConfig      — id, provider_type (unique), display_name, api_key (never in responses),
-                        base_url, model, is_active (single-active enforced), temperature, max_tokens
+AIProviderConfig      — id, provider_type (index, built-ins unique by code), display_name,
+                        api_key (never in responses), base_url, model, is_active (single-active enforced),
+                        temperature, max_tokens; supports multiple custom OpenAI-compatible endpoints
 ```
 
 ---
@@ -117,7 +119,8 @@ AIProviderConfig      — id, provider_type (unique), display_name, api_key (nev
 
 ### Next up (no particular order)
 - OAuth (when credentials arrive) — then real Gmail/Outlook sync
-- Month calendar view
+- Recurring calendar events (RRULE subset)
+- Custom user folders + drag/drop email organization
 - Auto-start on boot option
 - Inno Setup / NSIS installer wrapping `dist/commhub.exe`
 
@@ -128,7 +131,7 @@ AIProviderConfig      — id, provider_type (unique), display_name, api_key (nev
 ```bash
 # Development
 python run.py                       # starts on http://127.0.0.1:8765
-pytest -v                           # 71 tests
+pytest -v                           # 79 tests
 
 # Seed demo data
 curl -X POST http://127.0.0.1:8765/api/seed

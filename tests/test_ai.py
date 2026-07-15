@@ -1,3 +1,4 @@
+import datetime
 import pytest
 from app.ai.providers import get_provider, PROVIDER_REGISTRY
 from app.ai.providers.base import AIProviderConfig
@@ -10,10 +11,14 @@ class TestProviderRegistry:
         assert "openai" in PROVIDER_REGISTRY
         assert "anthropic" in PROVIDER_REGISTRY
         assert "ollama" in PROVIDER_REGISTRY
+        assert "custom" in PROVIDER_REGISTRY
 
     def test_get_provider_raises_for_unknown(self):
         with pytest.raises(ValueError, match="Unknown provider"):
             get_provider("nonexistent")
+
+    def test_custom_provider_uses_openai_class(self):
+        assert PROVIDER_REGISTRY["custom"] is PROVIDER_REGISTRY["openai"]
 
 
 class TestMockProvider:
@@ -51,6 +56,7 @@ class TestAIProviderConfigCRUD:
         assert "openai" in providers
         assert "anthropic" in providers
         assert "ollama" in providers
+        assert "custom" in providers
 
     @pytest.mark.asyncio
     async def test_create_and_list_config(self, client):
@@ -82,11 +88,25 @@ class TestAIProviderConfigCRUD:
         assert "api_key" not in configs[0]
 
     @pytest.mark.asyncio
-    async def test_create_duplicate_provider_returns_409(self, client):
+    async def test_create_duplicate_builtin_provider_returns_409(self, client):
         payload = {"provider_type": "openai", "display_name": "Test", "api_key": "sk-test"}
         await client.post("/api/ai/configs", json=payload)
         resp = await client.post("/api/ai/configs", json=payload)
         assert resp.status_code == 409
+
+    @pytest.mark.asyncio
+    async def test_create_multiple_custom_providers_allowed(self, client):
+        for i in range(3):
+            resp = await client.post("/api/ai/configs", json={
+                "provider_type": "custom",
+                "display_name": f"Custom {i}",
+                "base_url": f"https://api{i}.example.com/v1",
+                "model": f"model-{i}",
+                "api_key": "sk-test",
+            })
+            assert resp.status_code == 201, f"Failed creating custom provider {i}: {resp.json()}"
+        list_resp = await client.get("/api/ai/configs")
+        assert len(list_resp.json()) == 3
 
     @pytest.mark.asyncio
     async def test_create_unknown_provider_returns_400(self, client):
@@ -97,10 +117,10 @@ class TestAIProviderConfigCRUD:
 
     @pytest.mark.asyncio
     async def test_activating_provider_deactivates_others(self, client):
-        await client.post("/api/ai/configs", json={"provider_type": "openai", "display_name": "A"})
-        await client.post("/api/ai/configs", json={"provider_type": "anthropic", "display_name": "B"})
-        await client.put("/api/ai/configs/openai", json={"is_active": True})
-        await client.put("/api/ai/configs/anthropic", json={"is_active": True})
+        r1 = await client.post("/api/ai/configs", json={"provider_type": "openai", "display_name": "A"})
+        r2 = await client.post("/api/ai/configs", json={"provider_type": "anthropic", "display_name": "B"})
+        await client.put(f"/api/ai/configs/{r1.json()['id']}", json={"is_active": True})
+        await client.put(f"/api/ai/configs/{r2.json()['id']}", json={"is_active": True})
 
         configs = (await client.get("/api/ai/configs")).json()
         active = [c for c in configs if c["is_active"]]
@@ -109,10 +129,11 @@ class TestAIProviderConfigCRUD:
 
     @pytest.mark.asyncio
     async def test_update_config(self, client):
-        await client.post("/api/ai/configs", json={
+        create = await client.post("/api/ai/configs", json={
             "provider_type": "anthropic", "display_name": "Claude", "api_key": "sk-ant-test",
         })
-        update_resp = await client.put("/api/ai/configs/anthropic", json={
+        config_id = create.json()["id"]
+        update_resp = await client.put(f"/api/ai/configs/{config_id}", json={
             "display_name": "Claude Updated", "model": "claude-opus-4", "is_active": True,
         })
         assert update_resp.status_code == 200
@@ -123,17 +144,18 @@ class TestAIProviderConfigCRUD:
 
     @pytest.mark.asyncio
     async def test_update_nonexistent_returns_404(self, client):
-        resp = await client.put("/api/ai/configs/nonexistent", json={"display_name": "X"})
+        resp = await client.put("/api/ai/configs/99999", json={"display_name": "X"})
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
     async def test_delete_config(self, client):
-        await client.post("/api/ai/configs", json={
+        create = await client.post("/api/ai/configs", json={
             "provider_type": "ollama", "display_name": "Local LLM", "api_key": "",
         })
-        del_resp = await client.delete("/api/ai/configs/ollama")
+        config_id = create.json()["id"]
+        del_resp = await client.delete(f"/api/ai/configs/{config_id}")
         assert del_resp.status_code == 200
-        assert del_resp.json()["deleted"] == "ollama"
+        assert del_resp.json()["deleted"] == config_id
         list_resp = await client.get("/api/ai/configs")
         assert len(list_resp.json()) == 0
 
@@ -186,6 +208,26 @@ class TestAIEndpointsWithMock:
         assert resp.status_code == 200
         assert resp.json()["result"] == "work"
 
+    @pytest.mark.asyncio
+    async def test_organize_endpoint(self, client, db_session, mock_provider_override):
+        from app.models import EmailAccount, Email, ProviderType
+        acct = EmailAccount(email="organize@test.com", provider=ProviderType.GMAIL)
+        db_session.add(acct)
+        await db_session.commit()
+
+        db_session.add_all([
+            Email(account_id=acct.id, provider_message_id="m1", from_address="a@b.com", to_addresses=acct.email,
+                  subject="Invoice #123", body_text="Please pay invoice 123", folder="INBOX", received_at=datetime.datetime.now(datetime.UTC)),
+            Email(account_id=acct.id, provider_message_id="m2", from_address="c@d.com", to_addresses=acct.email,
+                  subject="Team lunch", body_text="Lunch tomorrow at noon", folder="INBOX", received_at=datetime.datetime.now(datetime.UTC)),
+        ])
+        await db_session.commit()
+
+        resp = await client.post("/api/ai/organize", json={"folder": "INBOX", "limit": 50})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "suggestions" in data
+
 
 class TestAIEndpointNoActiveProvider:
     @pytest.mark.asyncio
@@ -193,3 +235,5 @@ class TestAIEndpointNoActiveProvider:
         resp = await client.post("/api/ai/draft", json={"email_text": "Hello world"})
         assert resp.status_code == 400
         assert "No active AI provider" in resp.json()["detail"]
+
+

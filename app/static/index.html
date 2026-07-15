@@ -78,6 +78,45 @@
                 </template>
             </div>
 
+            <!-- Mini Calendar -->
+            <div x-show="page === 'calendar'" x-cloak class="px-3 py-2 border-t border-gray-200 dark:border-gray-800">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-gray-700 dark:text-gray-300" x-text="monthYear(miniCalendarDate)"></span>
+                    <div class="flex gap-0.5">
+                        <button @click="miniCalendarDate.setMonth(miniCalendarDate.getMonth() - 1); miniCalendarDate = new Date(miniCalendarDate)" class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 cursor-pointer" aria-label="Previous month">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        </button>
+                        <button @click="miniCalendarDate.setMonth(miniCalendarDate.getMonth() + 1); miniCalendarDate = new Date(miniCalendarDate)" class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 cursor-pointer" aria-label="Next month">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-7 gap-px mb-1">
+                    <template x-for="d in ['S','M','T','W','T','F','S']" :key="d">
+                        <div class="text-center text-[10px] font-medium text-gray-500" x-text="d"></div>
+                    </template>
+                </div>
+                <div class="grid grid-cols-7 gap-1">
+                    <template x-for="day in (() => {
+                        const d = new Date(miniCalendarDate); d.setDate(1);
+                        const start = new Date(d); start.setDate(start.getDate() - start.getDay());
+                        const days = [];
+                        for (let i = 0; i < 42; i++) { const x = new Date(start); x.setDate(start.getDate() + i); days.push(x); }
+                        return days;
+                    })()" :key="day.toISOString()">
+                        <button @click="calendarGoToDate(day)"
+                                class="w-6 h-6 text-[10px] rounded-full flex items-center justify-center cursor-pointer transition-colors duration-150"
+                                :class="{
+                                    'text-gray-400': day.getMonth() !== miniCalendarDate.getMonth(),
+                                    'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800': day.getMonth() === miniCalendarDate.getMonth() && !isToday(day),
+                                    'bg-blue-600 text-white hover:bg-blue-700': isToday(day)
+                                }"
+                                x-text="day.getDate()">
+                        </button>
+                    </template>
+                </div>
+            </div>
+
             <div class="p-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-xs">
                 <div class="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                     <span class="w-2 h-2 rounded-full" :class="health ? 'bg-green-500' : 'bg-red-500'" aria-hidden="true"></span>
@@ -302,43 +341,187 @@
                     <!-- ============ CALENDAR ============ -->
                     <template x-if="page === 'calendar'">
                         <section class="flex flex-col h-full min-h-0" aria-label="Calendar">
+                            <!-- Calendar toolbar -->
                             <div class="flex items-center justify-between mb-4 shrink-0 flex-wrap gap-2">
-                                <h3 class="text-base font-semibold" x-text="calendarWeekLabel()"></h3>
+                                <div class="flex items-center gap-3 flex-wrap">
+                                    <h3 class="text-base font-semibold" x-text="calendarRangeLabel()"></h3>
+                                    <div class="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5" role="tablist" aria-label="Calendar view">
+                                        <button @click="setCalendarView('day')" :class="calendarView === 'day' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-600 dark:text-gray-400'"
+                                                class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors duration-150 cursor-pointer" aria-pressed="calendarView === 'day'">Day</button>
+                                        <button @click="setCalendarView('week')" :class="calendarView === 'week' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-600 dark:text-gray-400'"
+                                                class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors duration-150 cursor-pointer" aria-pressed="calendarView === 'week'">Week</button>
+                                        <button @click="setCalendarView('month')" :class="calendarView === 'month' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-600 dark:text-gray-400'"
+                                                class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors duration-150 cursor-pointer" aria-pressed="calendarView === 'month'">Month</button>
+                                        <button @click="setCalendarView('agenda')" :class="calendarView === 'agenda' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-600 dark:text-gray-400'"
+                                                class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors duration-150 cursor-pointer" aria-pressed="calendarView === 'agenda'">Agenda</button>
+                                    </div>
+                                </div>
                                 <div class="flex items-center gap-1">
-                                    <button @click="calendarPrevWeek()" class="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150" aria-label="Previous week">
+                                    <button @click="calendarPrev()" class="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150" aria-label="Previous period">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                                     </button>
                                     <button @click="calendarToday()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150">Today</button>
-                                    <button @click="calendarNextWeek()" class="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150" aria-label="Next week">
+                                    <button @click="calendarNext()" class="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150" aria-label="Next period">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                     </button>
+                                    <select x-model="calendarFilter" @change="loadCalendarEvents()" class="ml-2 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1.5 cursor-pointer" aria-label="Filter events by category">
+                                        <option value="all">All categories</option>
+                                        <template x-for="cat in calendarCategories" :key="cat.name">
+                                            <option :value="cat.name" x-text="cat.name.charAt(0).toUpperCase() + cat.name.slice(1)"></option>
+                                        </template>
+                                    </select>
                                     <span class="text-xs text-gray-600 dark:text-gray-400 ml-2" x-text="events.length + ' events'"></span>
                                 </div>
                             </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-px bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden overflow-y-auto">
-                                <template x-for="(day, idx) in calendarDays" :key="idx">
-                                    <div class="bg-white dark:bg-gray-900 min-h-[110px] p-2"
-                                         :class="isToday(day.date) ? 'bg-blue-50 dark:bg-blue-900/20' : ''">
-                                        <div class="flex items-center justify-between mb-1.5">
-                                            <span class="text-xs font-medium text-gray-600 dark:text-gray-400" x-text="dayName(day.date)"></span>
-                                            <span class="text-xs font-semibold"
-                                                  :class="isToday(day.date) ? 'bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center' : 'text-gray-700 dark:text-gray-300'"
-                                                  x-text="dayNum(day.date)"></span>
-                                        </div>
-                                        <div class="space-y-1">
-                                            <template x-for="evt in day.events" :key="evt.id">
-                                                <button @click="editEvent(evt)"
-                                                        class="block w-full text-left text-xs px-1.5 py-1 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-200 truncate cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors duration-150"
-                                                        x-text="evt.title"></button>
-                                            </template>
-                                            <button @click="openNewEvent(day)"
-                                                    class="w-full text-left text-xs text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 px-1.5 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors duration-150"
-                                                    :aria-label="'Add event on ' + day.date.toLocaleDateString()">
-                                                + Add
-                                            </button>
+
+                            <div class="flex flex-1 min-h-0 gap-4">
+                                <!-- Main calendar grid -->
+                                <div class="flex-1 min-w-0 overflow-y-auto">
+                                    <!-- Loading skeleton -->
+                                    <div x-show="calendarLoading" class="space-y-2">
+                                        <div class="h-8 bg-gray-100 dark:bg-gray-800 rounded w-1/3 animate-pulse"></div>
+                                        <div class="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden">
+                                            <template x-for="i in 7"><div class="h-24 bg-gray-50 dark:bg-gray-900"></div></template>
                                         </div>
                                     </div>
-                                </template>
+
+                                    <!-- Day view -->
+                                    <template x-if="calendarView === 'day' && !calendarLoading">
+                                        <div class="border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900 overflow-hidden">
+                                            <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950">
+                                                <div class="text-sm font-semibold" x-text="formatDateFull(_calendarRange().start)"></div>
+                                            </div>
+                                            <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                                                <template x-for="h in calendarDayHours()" :key="h.hour">
+                                                    <div class="flex min-h-[52px] hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer" @click="openNewEvent(null, h.hour)">
+                                                        <div class="w-14 shrink-0 px-2 py-1 text-xs text-gray-500 border-r border-gray-100 dark:border-gray-800" x-text="h.label"></div>
+                                                        <div class="flex-1 relative p-1">
+                                                            <template x-for="evt in calendarDayEvents().filter(e => new Date(e.start_time).getHours() === h.hour)" :key="evt.id">
+                                                                <button @click.stop="viewEvent(evt)" class="block w-full text-left text-xs px-2 py-1 rounded mb-1 truncate text-white"
+                                                                        :style="'background-color: ' + calendarEventColor(evt.category)"
+                                                                        x-text="evt.title"></button>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            <div x-show="calendarDayEvents().length === 0" class="p-6 text-center text-sm text-gray-500">No events today. Click a time slot to add one.</div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Week view -->
+                                    <template x-if="calendarView === 'week' && !calendarLoading">
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-px bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden">
+                                            <template x-for="(day, idx) in calendarMonthDays()" :key="idx">
+                                                <div class="bg-white dark:bg-gray-900 min-h-[140px] p-2"
+                                                     :class="isToday(day.date) ? 'bg-blue-50 dark:bg-blue-900/20' : ''">
+                                                    <div class="flex items-center justify-between mb-1.5">
+                                                        <span class="text-xs font-medium text-gray-600 dark:text-gray-400" x-text="dayName(day.date)"></span>
+                                                        <span class="text-xs font-semibold"
+                                                              :class="isToday(day.date) ? 'bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center' : 'text-gray-700 dark:text-gray-300'"
+                                                              x-text="dayNum(day.date)"></span>
+                                                    </div>
+                                                    <div class="space-y-1">
+                                                        <template x-for="evt in day.events" :key="evt.id">
+                                                            <button @click="viewEvent(evt)" class="block w-full text-left text-xs px-1.5 py-1 rounded truncate text-white cursor-pointer hover:opacity-90 transition-opacity duration-150"
+                                                                    :style="'background-color: ' + calendarEventColor(evt.category)"
+                                                                    x-text="evt.title"></button>
+                                                        </template>
+                                                        <button @click="openNewEvent(day)"
+                                                                class="w-full text-left text-xs text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 px-1.5 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors duration-150"
+                                                                :aria-label="'Add event on ' + day.date.toLocaleDateString()">+ Add</button>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    <!-- Month view -->
+                                    <template x-if="calendarView === 'month' && !calendarLoading">
+                                        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+                                            <div class="grid grid-cols-7 border-b border-gray-200 dark:border-gray-800">
+                                                <template x-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d">
+                                                    <div class="py-1.5 text-center text-xs font-medium text-gray-500" x-text="d"></div>
+                                                </template>
+                                            </div>
+                                            <div class="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-800">
+                                                <template x-for="(day, idx) in calendarMonthDays()" :key="idx">
+                                                    <div class="bg-white dark:bg-gray-900 min-h-[100px] p-1.5"
+                                                         :class="isToday(day.date) ? 'bg-blue-50 dark:bg-blue-900/20' : ''">
+                                                        <div class="flex items-center justify-between mb-1">
+                                                            <span class="text-xs font-semibold w-6 h-6 flex items-center justify-center"
+                                                                  :class="isToday(day.date) ? 'bg-blue-600 text-white rounded-full' : 'text-gray-500'"
+                                                                  x-text="dayNum(day.date)"></span>
+                                                        </div>
+                                                        <div class="space-y-1">
+                                                            <template x-for="evt in day.events.slice(0, 3)" :key="evt.id">
+                                                                <button @click="viewEvent(evt)" class="block w-full text-left text-[10px] px-1 py-0.5 rounded truncate text-white leading-tight cursor-pointer hover:opacity-90 transition-opacity duration-150"
+                                                                        :style="'background-color: ' + calendarEventColor(evt.category)"
+                                                                        x-text="evt.title"></button>
+                                                            </template>
+                                                            <button x-show="day.events.length > 3" @click="setCalendarView('day'); calendarGoToDate(day.date)"
+                                                                    class="w-full text-left text-[10px] text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">+ <span x-text="day.events.length - 3"></span> more</button>
+                                                            <button @click="openNewEvent(day)" class="w-full text-left text-[10px] text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">+ Add</button>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Agenda view -->
+                                    <template x-if="calendarView === 'agenda' && !calendarLoading">
+                                        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+                                            <div class="divide-y divide-gray-200 dark:divide-gray-800">
+                                                <template x-for="evt in calendarAgendaEvents()" :key="evt.id">
+                                                    <div class="p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors duration-150" @click="viewEvent(evt)">
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="w-2 h-2 rounded-full shrink-0" :style="'background-color: ' + calendarEventColor(evt.category)"></span>
+                                                            <div class="flex-1 min-w-0">
+                                                                <div class="text-sm font-medium truncate" x-text="evt.title"></div>
+                                                                <div class="text-xs text-gray-500" x-text="formatDateFull(evt.start_time) + ' · ' + formatTime(evt.start_time) + ' — ' + formatTime(evt.end_time)"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                                <div x-show="calendarAgendaEvents().length === 0" class="p-6 text-center text-sm text-gray-500">No events in this period.</div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <!-- Event detail panel -->
+                                <div x-show="selectedEvent" x-cloak class="hidden lg:block w-72 shrink-0 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900 p-4 overflow-y-auto">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-xs font-medium px-2 py-0.5 rounded-full text-white"
+                                              :style="'background-color: ' + calendarEventColor(selectedEvent?.category)">
+                                              <span x-text="selectedEvent?.category ? selectedEvent.category.charAt(0).toUpperCase() + selectedEvent.category.slice(1) : 'Other'"></span>
+                                        </span>
+                                        <button @click="selectedEvent = null" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 p-1 rounded cursor-pointer" aria-label="Close event details">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
+                                    </div>
+                                    <h4 class="font-semibold mb-2" x-text="selectedEvent?.title"></h4>
+                                    <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1.5 mb-4">
+                                        <div class="flex items-start gap-2">
+                                            <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                            <span x-text="formatDateFull(selectedEvent?.start_time)"></span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            <span x-text="formatTime(selectedEvent?.start_time) + ' — ' + formatTime(selectedEvent?.end_time)"></span>
+                                        </div>
+                                        <div x-show="selectedEvent?.location" class="flex items-start gap-2">
+                                            <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                            <span x-text="selectedEvent?.location"></span>
+                                        </div>
+                                    </div>
+                                    <p x-show="selectedEvent?.description" class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap mb-4" x-text="selectedEvent?.description"></p>
+                                    <div class="flex gap-2">
+                                        <button @click="editEvent(selectedEvent)" class="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors duration-150">Edit</button>
+                                        <button @click="requestDelete('event', selectedEvent?.id, selectedEvent?.title)" class="px-3 py-1.5 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer transition-colors duration-150">Delete</button>
+                                    </div>
+                                </div>
                             </div>
                         </section>
                     </template>
@@ -473,62 +656,79 @@
                                     <span class="text-xs text-gray-500" x-text="aiActiveLabel ? 'Active: ' + aiActiveLabel : 'None active'"></span>
                                 </div>
                                 <ul class="space-y-2 mb-4" role="list">
-                                    <template x-for="cfg in aiConfigs" :key="cfg.provider_type">
+                                    <template x-for="cfg in aiConfigs" :key="cfg.id">
                                         <li class="border border-gray-200 dark:border-gray-800 rounded-lg p-3 flex items-center justify-between gap-2"
                                             :class="{ 'ring-2 ring-blue-500': cfg.is_active }">
                                             <div class="min-w-0">
                                                 <div class="text-sm font-medium" x-text="cfg.display_name"></div>
                                                 <div class="text-xs text-gray-600 dark:text-gray-400">
                                                     <span x-text="cfg.provider_type"></span> · <span x-text="cfg.model || 'default model'"></span>
+                                                    <span x-show="cfg.base_url" class="font-mono" x-text="' · ' + cfg.base_url"></span>
                                                     <span x-show="cfg.has_api_key" class="font-mono" x-text="' · ' + cfg.api_key_masked"></span>
                                                     <span x-show="cfg.is_active" class="ml-1 text-blue-700 dark:text-blue-400 font-medium">Active</span>
                                                 </div>
                                             </div>
                                             <div class="flex gap-1 shrink-0">
                                                 <button @click="editAiConfig(cfg)" class="text-xs text-gray-600 dark:text-gray-400 px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150">Edit</button>
-                                                <button x-show="!cfg.is_active" @click="activateAiProvider(cfg.provider_type)" class="text-xs text-blue-700 dark:text-blue-400 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors duration-150">Activate</button>
-                                                <button @click="requestDelete('aiConfig', cfg.provider_type, cfg.display_name)" class="text-xs text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer transition-colors duration-150">Delete</button>
+                                                <button x-show="!cfg.is_active" @click="activateAiProvider(cfg.id)" class="text-xs text-blue-700 dark:text-blue-400 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors duration-150">Activate</button>
+                                                <button @click="requestDelete('aiConfig', cfg.id, cfg.display_name)" class="text-xs text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer transition-colors duration-150">Delete</button>
                                             </div>
                                         </li>
                                     </template>
                                 </ul>
                                 <p x-show="aiConfigs.length === 0" class="text-sm text-gray-500 mb-4">No AI providers configured.</p>
 
-                                <div x-show="unconfiguredProviders.length > 0" class="flex flex-wrap gap-2 mb-4">
+                                <div class="flex flex-wrap gap-2 mb-4">
                                     <template x-for="p in unconfiguredProviders" :key="p">
                                         <button @click="openNewAiConfig(p)"
                                                 class="px-3 py-1.5 border border-dashed border-gray-300 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400 rounded-lg hover:border-blue-500 hover:text-blue-700 dark:hover:text-blue-400 cursor-pointer transition-colors duration-150">
-                                            + <span x-text="p"></span>
+                                            + <span x-text="p.charAt(0).toUpperCase() + p.slice(1)"></span>
                                         </button>
                                     </template>
+                                    <button @click="openNewAiConfig('custom')"
+                                            class="px-3 py-1.5 border border-dashed border-blue-300 dark:border-blue-700 text-xs text-blue-700 dark:text-blue-400 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors duration-150">
+                                        + Custom Endpoint
+                                    </button>
                                 </div>
 
                                 <!-- AI config form -->
                                 <div x-show="aiFormOpen" class="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-gray-50 dark:bg-gray-950/50">
-                                    <h5 class="text-sm font-medium mb-3" x-text="(aiFormEdit ? 'Edit ' : 'Add ') + aiForm.provider_type"></h5>
+                                    <h5 class="text-sm font-medium mb-3" x-text="(aiFormEdit ? 'Edit ' : 'Add ') + (aiForm.provider_type === 'custom' ? 'Custom AI Endpoint' : aiForm.provider_type)"></h5>
                                     <div class="space-y-3 max-w-sm">
-                                        <div>
+                                        <div x-show="aiForm.provider_type === 'custom'">
                                             <label for="ai-name" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Display name</label>
-                                            <input id="ai-name" type="text" x-model="aiForm.display_name" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
+                                            <input id="ai-name" type="text" x-model="aiForm.display_name" placeholder="Groq, DeepSeek, vLLM..."
+                                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
+                                        </div>
+                                        <div x-show="aiForm.provider_type !== 'custom'">
+                                            <label for="ai-name" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Display name</label>
+                                            <input id="ai-name" type="text" x-model="aiForm.display_name"
+                                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
                                         </div>
                                         <div>
                                             <label for="ai-key" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                                                 API key <span x-show="aiFormEdit" class="text-gray-500 font-normal">(leave blank to keep current)</span>
                                             </label>
-                                            <input id="ai-key" type="password" x-model="aiForm.api_key" autocomplete="off" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
+                                            <input id="ai-key" type="password" x-model="aiForm.api_key" autocomplete="off"
+                                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
                                         </div>
                                         <div>
-                                            <label for="ai-url" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Base URL <span class="text-gray-500 font-normal">(optional)</span></label>
-                                            <input id="ai-url" type="text" x-model="aiForm.base_url" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
+                                            <label for="ai-url" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Endpoint URL <span x-show="aiForm.provider_type !== 'custom'" class="text-gray-500 font-normal">(optional)</span>
+                                            </label>
+                                            <input id="ai-url" type="text" x-model="aiForm.base_url" placeholder="https://api.example.com/v1"
+                                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
                                         </div>
                                         <div class="grid grid-cols-2 gap-3">
                                             <div>
                                                 <label for="ai-model" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Model</label>
-                                                <input id="ai-model" type="text" x-model="aiForm.model" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
+                                                <input id="ai-model" type="text" x-model="aiForm.model" placeholder="llama3-8b-8192"
+                                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
                                             </div>
                                             <div>
                                                 <label for="ai-temp" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Temperature</label>
-                                                <input id="ai-temp" type="number" step="0.1" min="0" max="2" x-model.number="aiForm.temperature" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
+                                                <input id="ai-temp" type="number" step="0.1" min="0" max="2" x-model.number="aiForm.temperature"
+                                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none">
                                             </div>
                                         </div>
                                         <div class="flex gap-2 pt-1">
@@ -540,6 +740,9 @@
                                         <p x-show="aiFormError" class="text-xs text-red-600" role="alert" x-text="aiFormError"></p>
                                     </div>
                                 </div>
+                            </div>
+                        </section>
+                    </template>
                             </div>
                         </section>
                     </template>
@@ -580,6 +783,7 @@
                             <button @click="aiAction('summarize')" :disabled="aiLoading" class="px-2.5 py-1.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer">Summarize</button>
                             <button @click="aiAction('categorize')" :disabled="aiLoading" class="px-2.5 py-1.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer">Categorize</button>
                             <button @click="aiAction('chat')" :disabled="aiLoading" class="px-2.5 py-1.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer">Chat</button>
+                            <button @click="openAiOrganize()" :disabled="aiLoading" class="px-2.5 py-1.5 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 text-xs font-medium rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer">Organize Inbox</button>
                         </div>
 
                         <div x-show="aiLoading" class="flex items-center justify-center gap-2 text-xs text-gray-500 py-3" aria-live="polite">
@@ -671,6 +875,14 @@
                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800">
                         </div>
                     </div>
+                    <div>
+                        <label for="event-category" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                        <select id="event-category" x-model="eventForm.category" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 cursor-pointer">
+                            <template x-for="cat in calendarCategories" :key="cat.name">
+                                <option :value="cat.name" x-text="cat.name.charAt(0).toUpperCase() + cat.name.slice(1)"></option>
+                            </template>
+                        </select>
+                    </div>
                     <div class="flex gap-2 pt-2">
                         <button @click="saveEvent()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-150 cursor-pointer">Save</button>
                         <button @click="closeEventForm()" class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 cursor-pointer">Cancel</button>
@@ -715,6 +927,55 @@
                     <div class="flex items-center justify-between"><dt class="text-gray-600 dark:text-gray-400">Close / back</dt><dd><kbd class="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded">Esc</kbd></dd></div>
                     <div class="flex items-center justify-between"><dt class="text-gray-600 dark:text-gray-400">This help</dt><dd><kbd class="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded">?</kbd></dd></div>
                 </dl>
+            </div>
+        </div>
+
+        <!-- ============ AI Organization Modal ============ -->
+        <div x-cloak x-show="aiOrganizeOpen" class="fixed inset-0 bg-black/40 dark:bg-black/60 z-[55] flex items-center justify-center p-4"
+             @click.self="closeAiOrganize()" role="dialog" aria-modal="true" aria-labelledby="organize-title">
+            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl w-[560px] max-w-full max-h-[85vh] overflow-y-auto p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 id="organize-title" class="font-semibold">AI Inbox Organizer</h3>
+                    <button @click="closeAiOrganize()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150" aria-label="Close organizer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">The AI reads the unread emails in your inbox and suggests folders for each one. Approve individually, or apply all.</p>
+
+                <div x-show="aiOrganizeSuggestions.length === 0 && !aiOrganizeLoading" class="text-center py-8">
+                    <button @click="aiOrganizeInbox()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 cursor-pointer transition-colors duration-150">Analyze Inbox</button>
+                </div>
+
+                <div x-show="aiOrganizeLoading" class="flex items-center justify-center gap-2 text-sm text-gray-500 py-8" aria-live="polite">
+                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    Analyzing your inbox...
+                </div>
+
+                <div x-show="aiOrganizeSuggestions.length > 0" class="space-y-2 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium text-gray-700 dark:text-gray-300" x-text="aiOrganizeSuggestions.length + ' suggestions'"></span>
+                        <button @click="aiApplyAll()" class="text-xs font-medium text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer transition-colors duration-150">Apply all</button>
+                    </div>
+                    <template x-for="s in aiOrganizeSuggestions" :key="s.email_id">
+                        <div class="border border-gray-200 dark:border-gray-800 rounded-lg p-3 bg-gray-50 dark:bg-gray-950/50">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-sm font-medium truncate" x-text="s.subject"></div>
+                                    <div class="text-xs text-gray-500 mt-0.5" x-text="s.reason"></div>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200" x-text="s.suggested_folder"></span>
+                                    <button @click="aiApplySuggestion(s.email_id, s.suggested_folder)" class="text-xs text-green-700 dark:text-green-400 px-2 py-1 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 cursor-pointer transition-colors duration-150" aria-label="Move to suggested folder">Move</button>
+                                    <button @click="aiOrganizeSuggestions = aiOrganizeSuggestions.filter(x => x.email_id !== s.email_id)" class="text-xs text-gray-500 px-2 py-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150" aria-label="Ignore suggestion">Ignore</button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button @click="closeAiOrganize()" class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors duration-150">Close</button>
+                </div>
             </div>
         </div>
 

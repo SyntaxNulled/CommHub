@@ -8,6 +8,7 @@ PROVIDER_REGISTRY: dict[str, type[AIProvider]] = {
     "openai": OpenAIProvider,
     "anthropic": AnthropicProvider,
     "ollama": OllamaProvider,
+    "custom": OpenAIProvider,  # OpenAI-compatible custom endpoints (Groq, DeepSeek, vLLM, etc.)
 }
 
 

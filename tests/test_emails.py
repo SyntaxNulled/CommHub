@@ -226,3 +226,48 @@ class TestEmailAPI:
 
         resp3 = await client.get("/api/emails?folder=INBOX&page=3&page_size=2")
         assert len(resp3.json()) == 1
+
+    @pytest.mark.asyncio
+    async def test_move_email(self, client, db_session):
+        acct = EmailAccount(email="mv@mv.com", provider=ProviderType.GMAIL)
+        db_session.add(acct)
+        await db_session.commit()
+        import datetime
+        email = Email(account_id=acct.id, provider_message_id="mv",
+                      from_address="a@b.com", to_addresses="mv@mv.com",
+                      subject="Move me", folder="INBOX", is_read=True,
+                      received_at=datetime.datetime.now(datetime.UTC))
+        db_session.add(email)
+        await db_session.commit()
+
+        resp = await client.post(f"/api/emails/{email.id}/move", json={"folder": "SENT"})
+        assert resp.status_code == 200
+        assert resp.json()["folder"] == "SENT"
+
+        # Moving back to INBOX resets read state
+        resp2 = await client.post(f"/api/emails/{email.id}/move", json={"folder": "INBOX"})
+        assert resp2.status_code == 200
+        assert resp2.json()["folder"] == "INBOX"
+        get_resp = await client.get(f"/api/emails/{email.id}")
+        assert get_resp.json()["is_read"] is False
+
+    @pytest.mark.asyncio
+    async def test_move_email_unknown_folder_returns_400(self, client, db_session):
+        acct = EmailAccount(email="bad@bad.com", provider=ProviderType.GMAIL)
+        db_session.add(acct)
+        await db_session.commit()
+        import datetime
+        email = Email(account_id=acct.id, provider_message_id="bad",
+                      from_address="a@b.com", to_addresses="bad@bad.com",
+                      subject="Bad folder", folder="INBOX",
+                      received_at=datetime.datetime.now(datetime.UTC))
+        db_session.add(email)
+        await db_session.commit()
+
+        resp = await client.post(f"/api/emails/{email.id}/move", json={"folder": "TRASH"})
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_move_email_nonexistent_returns_404(self, client):
+        resp = await client.post("/api/emails/99999/move", json={"folder": "SENT"})
+        assert resp.status_code == 404

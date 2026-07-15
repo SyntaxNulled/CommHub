@@ -22,6 +22,7 @@ class TestCalendarAPI:
             "account_id": acct.id,
             "title": "Team Standup",
             "description": "Daily standup",
+            "category": "meeting",
             "start_time": "2026-07-16T09:00:00",
             "end_time": "2026-07-16T09:30:00",
         })
@@ -29,6 +30,7 @@ class TestCalendarAPI:
         data = resp.json()
         assert data["title"] == "Team Standup"
         assert data["description"] == "Daily standup"
+        assert data["category"] == "meeting"
         assert "2026-07-16T09:00:00" in data["start_time"]
 
     @pytest.mark.asyncio
@@ -123,6 +125,37 @@ class TestCalendarAPI:
             "title": "Bad", "start_time": "not-a-date", "end_time": "also-not",
         })
         assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_categories_endpoint(self, client):
+        resp = await client.get("/api/calendar/categories")
+        assert resp.status_code == 200
+        data = resp.json()
+        names = [c["name"] for c in data]
+        assert "work" in names
+        assert "personal" in names
+        assert "meeting" in names
+        assert all("color" in c for c in data)
+
+    @pytest.mark.asyncio
+    async def test_filter_events_by_category(self, client, db_session):
+        from app.models import CalendarEvent, EmailAccount, ProviderType
+        acct = EmailAccount(email="cat@cat.com", provider=ProviderType.GMAIL)
+        db_session.add(acct)
+        await db_session.commit()
+
+        db_session.add_all([
+            CalendarEvent(account_id=acct.id, provider_event_id="c1", title="Work Event", category="work",
+                          start_time=datetime.datetime(2026, 7, 16, 10, 0), end_time=datetime.datetime(2026, 7, 16, 11, 0)),
+            CalendarEvent(account_id=acct.id, provider_event_id="c2", title="Personal Event", category="personal",
+                          start_time=datetime.datetime(2026, 7, 16, 14, 0), end_time=datetime.datetime(2026, 7, 16, 15, 0)),
+        ])
+        await db_session.commit()
+
+        resp = await client.get("/api/calendar/events?start=2026-07-15T00:00:00&end=2026-07-18T00:00:00&category=work")
+        titles = [e["title"] for e in resp.json()]
+        assert "Work Event" in titles
+        assert "Personal Event" not in titles
 
     @pytest.mark.asyncio
     async def test_seed_endpoint(self, client):
