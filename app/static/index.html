@@ -115,10 +115,11 @@
                                 <option value="read">Read</option>
                                 <option value="starred">Starred</option>
                             </select>
-                            <span class="text-xs text-gray-400 shrink-0" x-text="filteredEmails.length + ' of ' + emails.length"></span>
+                            <span class="text-xs text-gray-400 shrink-0" x-text="filteredEmails.length + ' shown · ' + totalEmails + ' total'"></span>
                         </div>
                         <div class="flex gap-4 flex-1 min-h-0">
-                        <div class="divide-y divide-gray-100 dark:divide-gray-800 overflow-y-auto" :class="selectedEmail ? 'w-2/5 shrink-0' : 'w-full'">
+                        <div class="flex flex-col" :class="selectedEmail ? 'w-2/5 shrink-0' : 'w-full'">
+                            <div class="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
                             <template x-for="email in filteredEmails" :key="email.id">
                                 <div @click="selectEmail(email)"
                                      class="flex items-start gap-3 px-3 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 border-l-2"
@@ -136,7 +137,13 @@
                                          <div class="text-xs text-gray-400 truncate" x-text="truncate(email.body_text, 80)"></div>
                                      </div>
                                 </div>
-                            </template>
+                             </template>
+                            </div>
+                            <div class="shrink-0 flex items-center justify-between px-3 py-2 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400" x-show="totalPages > 1">
+                                <button @click="prevPage()" :disabled="currentPage === 1" class="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150">← Prev</button>
+                                <span x-text="'Page ' + currentPage + ' of ' + totalPages"></span>
+                                <button @click="nextPage()" :disabled="currentPage === totalPages" class="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150">Next →</button>
+                            </div>
                         </div>
 
                         <!-- EMAIL DETAIL PANE -->
@@ -184,10 +191,11 @@
                                 <option value="read">Read</option>
                                 <option value="starred">Starred</option>
                             </select>
-                            <span class="text-xs text-gray-400 shrink-0" x-text="filteredEmails.length + ' of ' + emails.length"></span>
+                            <span class="text-xs text-gray-400 shrink-0" x-text="filteredEmails.length + ' shown · ' + totalEmails + ' total'"></span>
                         </div>
                         <div class="flex gap-4 flex-1 min-h-0">
-                        <div class="divide-y divide-gray-100 dark:divide-gray-800 overflow-y-auto" :class="selectedEmail ? 'w-2/5 shrink-0' : 'w-full'">
+                        <div class="flex flex-col" :class="selectedEmail ? 'w-2/5 shrink-0' : 'w-full'">
+                            <div class="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
                             <template x-for="email in filteredEmails" :key="email.id">
                                 <div @click="selectEmail(email)"
                                      class="flex items-start gap-3 px-3 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -203,7 +211,13 @@
                                          <div class="text-sm text-gray-500 dark:text-gray-400 truncate" x-text="email.subject"></div>
                                      </div>
                                 </div>
-                            </template>
+                             </template>
+                            </div>
+                            <div class="shrink-0 flex items-center justify-between px-3 py-2 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400" x-show="totalPages > 1">
+                                <button @click="prevPage()" :disabled="currentPage === 1" class="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150">← Prev</button>
+                                <span x-text="'Page ' + currentPage + ' of ' + totalPages"></span>
+                                <button @click="nextPage()" :disabled="currentPage === totalPages" class="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150">Next →</button>
+                            </div>
                         </div>
 
                         <div x-show="selectedEmail" class="flex-1 overflow-y-auto border-l border-gray-200 dark:border-gray-800 pl-4">

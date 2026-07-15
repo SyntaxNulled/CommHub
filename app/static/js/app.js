@@ -28,6 +28,9 @@ document.addEventListener('alpine:init', () => {
         searchQuery: '',
         searchFilter: 'all',
         shortcutsOpen: false,
+        currentPage: 1,
+        pageSize: 20,
+        totalEmails: 0,
 
         // --- Calendar State ---
         events: [],
@@ -70,6 +73,9 @@ document.addEventListener('alpine:init', () => {
         },
         get accountOptions() {
             return this.accounts.map(a => ({ value: a.id, label: a.email }));
+        },
+        get totalPages() {
+            return Math.max(1, Math.ceil(this.totalEmails / this.pageSize));
         },
         get filteredEmails() {
             let list = this.emails;
@@ -142,6 +148,7 @@ document.addEventListener('alpine:init', () => {
             if (pageId !== 'inbox' && pageId !== 'sent' && pageId !== 'drafts' && pageId !== 'starred') this.composeOpen = false;
             if (['inbox', 'sent', 'drafts', 'starred'].includes(pageId)) {
                 this.currentFolder = pageId === 'starred' ? 'STARRED' : pageId.toUpperCase();
+                this.currentPage = 1;
                 this.loadEmails();
             }
         },
@@ -213,6 +220,22 @@ document.addEventListener('alpine:init', () => {
             this.selectEmail(list[idx]);
         },
 
+        nextPage() {
+            if (this.currentPage < this.totalPages) {
+                this.currentPage++;
+                this.selectedEmail = null;
+                this.loadEmails();
+            }
+        },
+
+        prevPage() {
+            if (this.currentPage > 1) {
+                this.currentPage--;
+                this.selectedEmail = null;
+                this.loadEmails();
+            }
+        },
+
         // --- Accounts ---
         async loadAccounts() {
             try {
@@ -230,8 +253,11 @@ document.addEventListener('alpine:init', () => {
         async loadEmails() {
             try {
                 const folder = this.currentFolder === 'STARRED' ? 'STARRED' : this.currentFolder;
-                const res = await fetch(`/api/emails?folder=${folder}`);
-                if (res.ok) this.emails = await res.json();
+                const res = await fetch(`/api/emails?folder=${folder}&page=${this.currentPage}&page_size=${this.pageSize}`);
+                if (res.ok) {
+                    this.emails = await res.json();
+                    this.totalEmails = parseInt(res.headers.get('X-Total-Count') || '0');
+                }
             } catch (e) {}
         },
 

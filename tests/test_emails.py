@@ -134,3 +134,28 @@ class TestEmailAPI:
 
         inbox = await client.get("/api/emails?folder=INBOX")
         assert len(inbox.json()) == 1
+
+    @pytest.mark.asyncio
+    async def test_pagination(self, client, db_session):
+        acct = EmailAccount(email="p@p.com", provider=ProviderType.GMAIL)
+        db_session.add(acct)
+        await db_session.commit()
+        import datetime
+        for i in range(5):
+            db_session.add(Email(account_id=acct.id, provider_message_id=f"pg-{i}",
+                                 from_address="a@b.com", to_addresses="p@p.com",
+                                 subject=f"Page test {i}", folder="INBOX",
+                                 received_at=datetime.datetime.now(datetime.UTC)))
+        await db_session.commit()
+
+        resp = await client.get("/api/emails?folder=INBOX&page=1&page_size=2")
+        assert resp.status_code == 200
+        assert resp.headers.get("X-Total-Count") == "5"
+        assert len(resp.json()) == 2
+
+        resp2 = await client.get("/api/emails?folder=INBOX&page=2&page_size=2")
+        assert resp2.headers.get("X-Total-Count") == "5"
+        assert len(resp2.json()) == 2
+
+        resp3 = await client.get("/api/emails?folder=INBOX&page=3&page_size=2")
+        assert len(resp3.json()) == 1

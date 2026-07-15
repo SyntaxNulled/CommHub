@@ -34,6 +34,9 @@ hiddenimports = [
     "httpx",
     "openai",
     "anthropic",
+    "pystray",
+    "PIL",
+    "PIL.Image",
 ]
 
 excludes = [
@@ -46,8 +49,6 @@ excludes = [
     "Cython",
     "numpy",
     "matplotlib",
-    "PIL.ImageTk",
-    "PIL.Tkinter",
 ]
 
 a = Analysis(
