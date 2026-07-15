@@ -8,8 +8,8 @@ from app.config import settings
 
 def main():
     url = f"http://{settings.host}:{settings.port}"
-    print(f"  🔄 CommHub v{settings.app_version}")
-    print(f"  🌐 Opening {url}")
+    print(f"  == CommHub v{settings.app_version} ==")
+    print(f"  Opening {url}")
     webbrowser.open(url)
     uvicorn.run(
         "app.main:app",

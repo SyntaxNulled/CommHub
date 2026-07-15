@@ -1,0 +1,22 @@
+2026-07-15 11:05:06,454 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 11:05:06,456 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("email_accounts")
+2026-07-15 11:05:06,459 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-07-15 11:05:06,466 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("emails")
+2026-07-15 11:05:06,468 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-07-15 11:05:06,473 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("calendar_events")
+2026-07-15 11:05:06,476 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-07-15 11:05:06,482 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("automation_rules")
+2026-07-15 11:05:06,485 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-07-15 11:05:06,491 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("ai_provider_configs")
+2026-07-15 11:05:06,493 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-07-15 11:05:06,498 INFO sqlalchemy.engine.Engine COMMIT
+2026-07-15 11:05:06,506 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 11:05:06,550 INFO sqlalchemy.engine.Engine SELECT automation_rules.id, automation_rules.name, automation_rules.description, automation_rules.account_id, automation_rules.is_enabled, automation_rules.trigger_type, automation_rules.trigger_config, automation_rules.action_type, automation_rules.action_config, automation_rules.cron_schedule, automation_rules.created_at 
+FROM automation_rules 
+WHERE automation_rules.is_enabled = 1 AND automation_rules.trigger_type = ? AND automation_rules.cron_schedule IS NOT NULL
+2026-07-15 11:05:06,552 INFO sqlalchemy.engine.Engine [generated in 0.00164s] ('cron_schedule',)
+2026-07-15 11:05:06,555 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:58470 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58470 - "GET /css/style.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58470 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60520 - "GET / HTTP/1.1" 200 OK
