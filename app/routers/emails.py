@@ -5,11 +5,24 @@ from pydantic import BaseModel
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.models import Email, EmailAccount
+from app.models import Email, EmailAccount, Folder
 
 router = APIRouter(prefix="/api/emails", tags=["emails"])
 
-FOLDERS = ["INBOX", "SENT", "DRAFTS", "STARRED"]
+SYSTEM_FOLDERS = {"INBOX", "SENT", "DRAFTS", "STARRED"}
+
+
+async def _validate_folder(folder: str, db: AsyncSession) -> str:
+    """Return the normalized folder name if it exists (system or user-defined), else 400."""
+    normalized = folder.upper().strip()
+    if normalized == "STARRED":
+        return normalized
+    if normalized in SYSTEM_FOLDERS:
+        return normalized
+    result = await db.execute(select(Folder).where(Folder.normalized_name == normalized))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(400, f"Unknown folder '{folder}'")
+    return normalized
 
 
 class EmailResponse(BaseModel):
@@ -69,9 +82,7 @@ async def list_emails(
     page_size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
-    folder = folder.upper()
-    if folder not in FOLDERS:
-        raise HTTPException(400, f"Unknown folder '{folder}'. Must be one of: {FOLDERS}")
+    folder = await _validate_folder(folder, db)
 
     q = select(Email)
     if folder == "STARRED":
@@ -229,9 +240,7 @@ async def toggle_star(email_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.post("/{email_id}/move")
 async def move_email(email_id: int, req: MoveEmailRequest, db: AsyncSession = Depends(get_db)):
-    folder = req.folder.upper().strip()
-    if folder not in FOLDERS:
-        raise HTTPException(400, f"Unknown folder '{folder}'. Must be one of: {FOLDERS}")
+    folder = await _validate_folder(req.folder, db)
     result = await db.execute(select(Email).where(Email.id == email_id))
     email = result.scalar_one_or_none()
     if not email:

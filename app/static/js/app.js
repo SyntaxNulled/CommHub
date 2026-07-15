@@ -88,6 +88,21 @@ document.addEventListener('alpine:init', () => {
         aiOrganizeSuggestions: [],
         aiOrganizeApplyAll: [],
 
+        // --- Folder State ---
+        folders: [],
+        folderFormOpen: false,
+        folderFormEdit: false,
+        folderFormEditId: null,
+        folderFormSaving: false,
+        folderForm: { name: '', color: 'blue', icon: 'folder' },
+        folderColors: ['blue', 'emerald', 'violet', 'red', 'amber', 'pink', 'gray', 'cyan', 'indigo', 'rose'],
+        folderColorMap: {
+            blue: '#2563EB', emerald: '#10B981', violet: '#8B5CF6', red: '#DC2626',
+            amber: '#F59E0B', pink: '#EC4899', gray: '#6B7280', cyan: '#06B6D4',
+            indigo: '#6366F1', rose: '#F43F5E',
+        },
+        folderIcons: ['folder', 'inbox', 'star', 'calendar', 'briefcase', 'user', 'tag', 'bell', 'document', 'code'],
+
         // --- Automation State ---
         automationRules: [],
         triggerTypes: [],
@@ -129,10 +144,14 @@ document.addEventListener('alpine:init', () => {
         },
         get pageTitle() {
             const titles = { inbox: 'Inbox', sent: 'Sent', drafts: 'Drafts', starred: 'Starred', calendar: 'Calendar', automation: 'Automation', settings: 'Settings' };
-            return titles[this.page] || 'CommHub';
+            if (titles[this.page]) return titles[this.page];
+            const folder = this.folders.find(f => f.normalized_name === this.currentFolder);
+            return folder ? folder.name : 'CommHub';
         },
         get isMailPage() {
-            return ['inbox', 'sent', 'drafts', 'starred'].includes(this.page);
+            const mailPages = ['inbox', 'sent', 'drafts', 'starred'];
+            if (mailPages.includes(this.page)) return true;
+            return this.folders.some(f => f.normalized_name === this.page.toUpperCase());
         },
         get calendarEventColor() {
             return (category) => {
@@ -153,6 +172,7 @@ document.addEventListener('alpine:init', () => {
             // Independent loads in parallel — sequential awaits doubled startup time
             await Promise.all([
                 this.loadAccounts(),
+                this.loadFolders(),
                 this.loadEmails(),
                 this.loadUnreadCount(),
                 this.loadAiProviders(),
@@ -207,6 +227,7 @@ document.addEventListener('alpine:init', () => {
             this.searchFilter = 'all';
             this.selectedEvent = null;
             this.aiOrganizeOpen = false;
+            this.closeFolderForm();
             if (pageId !== 'settings') this.closeAiForm();
             if (pageId !== 'automation') this.closeRuleForm();
             if (!this.isMailPage) this.composeOpen = false;
@@ -365,6 +386,7 @@ document.addEventListener('alpine:init', () => {
             else if (type === 'event') await this.deleteEvent(id);
             else if (type === 'rule') await this.deleteRule(id);
             else if (type === 'aiConfig') await this.deleteAiConfig(id);
+            else if (type === 'folder') await this.deleteFolder(id);
         },
 
         async deleteEmail(emailId) {
@@ -889,6 +911,125 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        // --- Folders ---
+        async loadFolders() {
+            try {
+                const res = await fetch('/api/folders');
+                if (res.ok) this.folders = await res.json();
+            } catch (e) {}
+        },
+        openNewFolder() {
+            this.folderForm = { name: '', color: 'blue', icon: 'folder' };
+            this.folderFormEdit = false;
+            this.folderFormEditId = null;
+            this.folderFormOpen = true;
+            this.$nextTick(() => document.getElementById('folder-name')?.focus());
+        },
+        editFolder(folder) {
+            this.folderForm = { name: folder.name, color: folder.color || 'blue', icon: folder.icon || 'folder' };
+            this.folderFormEdit = true;
+            this.folderFormEditId = folder.id;
+            this.folderFormOpen = true;
+        },
+        closeFolderForm() {
+            this.folderFormOpen = false;
+            this.folderFormEdit = false;
+            this.folderFormEditId = null;
+        },
+        async saveFolder() {
+            if (this.folderFormSaving) return;
+            if (!this.folderForm.name.trim()) { this.toast('Folder needs a name', 'error'); return; }
+            this.folderFormSaving = true;
+            try {
+                const url = this.folderFormEdit ? `/api/folders/${this.folderFormEditId}` : '/api/folders';
+                const method = this.folderFormEdit ? 'PUT' : 'POST';
+                const res = await fetch(url, {
+                    method, headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: this.folderForm.name.trim(),
+                        color: this.folderForm.color,
+                        icon: this.folderForm.icon,
+                    }),
+                });
+                if (res.ok) {
+                    this.closeFolderForm();
+                    await this.loadFolders();
+                    this.toast(this.folderFormEdit ? 'Folder updated' : 'Folder created', 'success');
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast(err.detail || 'Failed to save folder', 'error');
+                }
+            } catch (e) { this.toast('Network error saving folder', 'error'); }
+            finally { this.folderFormSaving = false; }
+        },
+        async deleteFolder(folderId) {
+            try {
+                const res = await fetch(`/api/folders/${folderId}`, { method: 'DELETE' });
+                if (res.ok) {
+                    await this.loadFolders();
+                    // If currently viewing the deleted folder, switch to inbox
+                    const deleted = this.folders.find(f => f.id === folderId);
+                    if (deleted && this.currentFolder === deleted.normalized_name) {
+                        this.navigate('inbox');
+                    }
+                    this.toast('Folder deleted', 'success');
+                } else {
+                    this.toast('Failed to delete folder', 'error');
+                }
+            } catch (e) { this.toast('Network error deleting folder', 'error'); }
+        },
+        async moveEmailToFolder(emailId, folderName) {
+            try {
+                const res = await fetch(`/api/emails/${emailId}/move`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder: folderName }),
+                });
+                if (res.ok) {
+                    this.toast('Email moved', 'success');
+                    // Remove from current list if it no longer belongs here
+                    const data = await res.json();
+                    if (this.currentFolder !== data.folder && this.currentFolder !== 'STARRED') {
+                        this.emails = this.emails.filter(e => e.id !== emailId);
+                        this.totalEmails = Math.max(0, this.totalEmails - 1);
+                    }
+                    if (this.selectedEmail?.id === emailId) this.selectedEmail = null;
+                    this.loadUnreadCount();
+                } else {
+                    this.toast('Failed to move email', 'error');
+                }
+            } catch (e) { this.toast('Network error moving email', 'error'); }
+        },
+        folderColorClass(color) {
+            const map = {
+                blue: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200',
+                emerald: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200',
+                violet: 'bg-violet-100 dark:bg-violet-900/40 text-violet-800 dark:text-violet-200',
+                red: 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200',
+                amber: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200',
+                pink: 'bg-pink-100 dark:bg-pink-900/40 text-pink-800 dark:text-pink-200',
+                gray: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200',
+                cyan: 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-200',
+                indigo: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200',
+                rose: 'bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-200',
+            };
+            return map[color] || map.blue;
+        },
+        folderIconSVG(icon) {
+            const icons = {
+                folder: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>',
+                inbox: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>',
+                star: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+                calendar: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>',
+                briefcase: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m14 0v10a2 2 0 01-2 2H5a2 2 0 01-2-2V6h18zM8 14v2m8-2v2"/></svg>',
+                user: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
+                tag: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.585l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>',
+                bell: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>',
+                document: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>',
+                code: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>',
+            };
+            return icons[icon] || icons.folder;
+        },
+
         // --- Automation ---
         async loadAutomationRules() {
             try { const r = await fetch('/api/automation/rules'); if (r.ok) this.automationRules = await r.json(); } catch (e) {}
@@ -949,7 +1090,7 @@ document.addEventListener('alpine:init', () => {
             return l[type] || type;
         },
         actionTypeLabel(type) {
-            const l = { auto_reply: 'Auto-Reply', categorize: 'Categorize', mark_read: 'Mark Read', star: 'Star', forward: 'Forward' };
+            const l = { auto_reply: 'Auto-Reply', categorize: 'Categorize', ai_categorize: 'AI Categorize', mark_read: 'Mark Read', star: 'Star', forward: 'Forward' };
             return l[type] || type;
         },
 

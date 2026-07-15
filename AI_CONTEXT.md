@@ -79,7 +79,7 @@ tests/                  — 71 pytest tests across 5 test files
 - `pytest` with `pytest-asyncio` (strict mode)
 - Test client: `httpx.AsyncClient` with `ASGITransport`
 - Each test file uses `override_get_db` to inject a fresh in-memory SQLite DB per test
-- 79 tests, all passing. Run: `pytest -v`
+- 84 tests, all passing. Run: `pytest -v`
 
 ### Packaging
 - PyInstaller via `commhub.spec` (includes pystray/PIL hidden imports)
@@ -96,6 +96,7 @@ Email                 — id, account_id*, folder, from_address, to_addresses, s
                         is_read, is_starred*, received_at   (* indexed; composite folder+received_at)
 CalendarEvent         — id, account_id*, title, description, start_time*, end_time, is_all_day,
                         category (work/personal/meeting/important/travel/birthday/reminder/other)
+Folder                — id, name, normalized_name (unique), color, icon, is_system, sort_order
 AutomationRule        — id, name, trigger_type, trigger_config, action_type, action_config,
                         cron_schedule (validated), is_enabled, account_id (nullable)
 AIProviderConfig      — id, provider_type (index, built-ins unique by code), display_name,
@@ -120,7 +121,8 @@ AIProviderConfig      — id, provider_type (index, built-ins unique by code), d
 ### Next up (no particular order)
 - OAuth (when credentials arrive) — then real Gmail/Outlook sync
 - Recurring calendar events (RRULE subset)
-- Custom user folders + drag/drop email organization
+- Drag-and-drop email organization + right-click context menu
+- Email snooze + undo send
 - Auto-start on boot option
 - Inno Setup / NSIS installer wrapping `dist/commhub.exe`
 
@@ -131,7 +133,7 @@ AIProviderConfig      — id, provider_type (index, built-ins unique by code), d
 ```bash
 # Development
 python run.py                       # starts on http://127.0.0.1:8765
-pytest -v                           # 79 tests
+pytest -v                           # 84 tests
 
 # Seed demo data
 curl -X POST http://127.0.0.1:8765/api/seed
