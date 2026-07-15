@@ -61,6 +61,9 @@ document.addEventListener('alpine:init', () => {
             const active = this.aiConfigs.find(c => c.is_active);
             return active ? active.display_name : null;
         },
+        get unreadCount() {
+            return this.emails.filter(e => !e.is_read).length;
+        },
         get accountOptions() {
             return this.accounts.map(a => ({ value: a.id, label: a.email }));
         },

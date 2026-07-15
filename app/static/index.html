@@ -22,14 +22,15 @@
             </div>
 
             <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto">
-                <template x-for="link in sidebarLinks.slice(0, 5)" :key="link.id">
-                    <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors"
-                       :class="page === link.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
-                       @click.prevent="navigate(link.id)">
-                        <span x-text="link.icon"></span>
-                        <span x-text="link.label"></span>
-                    </a>
-                </template>
+                    <template x-for="link in sidebarLinks.slice(0, 5)" :key="link.id">
+                        <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors"
+                           :class="page === link.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+                           @click.prevent="navigate(link.id)">
+                            <span x-text="link.icon"></span>
+                            <span x-text="link.label"></span>
+                            <span x-show="link.id === 'inbox' && unreadCount > 0" class="ml-auto bg-blue-600 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center" x-text="unreadCount"></span>
+                        </a>
+                    </template>
             </nav>
 
             <div class="border-t border-gray-200 pt-2 pb-2 px-2 space-y-0.5">
