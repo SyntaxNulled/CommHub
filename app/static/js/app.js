@@ -6,6 +6,7 @@ document.addEventListener('alpine:init', () => {
         health: null,
         loading: true,
         error: null,
+        darkMode: localStorage.getItem('commhub-dark') === 'true',
 
         sidebarLinks: [
             { id: 'inbox', label: 'Inbox', icon: '📥' },
@@ -61,6 +62,9 @@ document.addEventListener('alpine:init', () => {
             const active = this.aiConfigs.find(c => c.is_active);
             return active ? active.display_name : null;
         },
+        get unreadCount() {
+            return this.emails.filter(e => !e.is_read).length;
+        },
         get accountOptions() {
             return this.accounts.map(a => ({ value: a.id, label: a.email }));
         },
@@ -80,6 +84,7 @@ document.addEventListener('alpine:init', () => {
 
         // --- Init ---
         async init() {
+            if (this.darkMode) document.documentElement.classList.add('dark');
             await this.checkHealth();
             await this.loadAccounts();
             await this.loadEmails();
@@ -93,6 +98,10 @@ document.addEventListener('alpine:init', () => {
 
             this.$watch('page', (val) => {
                 if (val === 'calendar') this.loadCalendarEvents();
+            });
+            this.$watch('darkMode', (val) => {
+                document.documentElement.classList.toggle('dark', val);
+                localStorage.setItem('commhub-dark', val);
             });
         },
 
@@ -151,6 +160,9 @@ document.addEventListener('alpine:init', () => {
             } catch (e) {}
         },
 
+        toggleDarkMode() {
+            this.darkMode = !this.darkMode;
+        },
         closeEmailDetail() {
             this.selectedEmail = null;
         },

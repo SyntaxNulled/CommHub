@@ -22,7 +22,7 @@ class TestEmailAPI:
             from_address="sender@test.com", from_name="Sender",
             to_addresses="test@test.com", subject="Hello World",
             body_text="This is a test email", folder="INBOX",
-            received_at=datetime.datetime.utcnow(),
+            received_at=datetime.datetime.now(datetime.UTC),
         )
         db_session.add(email)
         await db_session.commit()
@@ -44,7 +44,7 @@ class TestEmailAPI:
             account_id=acct.id, provider_message_id="test-2",
             from_address="a@b.com", to_addresses="test@test.com",
             subject="Unread", body_text="Body", folder="INBOX",
-            received_at=datetime.datetime.utcnow(),
+            received_at=datetime.datetime.now(datetime.UTC),
         )
         db_session.add(email)
         await db_session.commit()
@@ -62,7 +62,7 @@ class TestEmailAPI:
         email = Email(account_id=acct.id, provider_message_id="t3",
                       from_address="a@b.com", to_addresses="t@t.com",
                       subject="S", folder="INBOX",
-                      received_at=datetime.datetime.utcnow())
+                      received_at=datetime.datetime.now(datetime.UTC))
         db_session.add(email)
         await db_session.commit()
 
@@ -106,7 +106,7 @@ class TestEmailAPI:
         email = Email(account_id=acct.id, provider_message_id="del",
                       from_address="a@b.com", to_addresses="t@t.com",
                       subject="Delete me", folder="INBOX",
-                      received_at=datetime.datetime.utcnow())
+                      received_at=datetime.datetime.now(datetime.UTC))
         db_session.add(email)
         await db_session.commit()
 
@@ -125,7 +125,7 @@ class TestEmailAPI:
             db_session.add(Email(account_id=acct.id, provider_message_id=f"f-{fld}",
                                  from_address="a@b.com", to_addresses="x@x.com",
                                  subject=fld, folder=fld,
-                                 received_at=datetime.datetime.utcnow()))
+                                 received_at=datetime.datetime.now(datetime.UTC)))
         await db_session.commit()
 
         sent = await client.get("/api/emails?folder=SENT")

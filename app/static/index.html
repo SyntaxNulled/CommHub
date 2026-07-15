@@ -4,297 +4,309 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CommHub</title>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="/js/app.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="/css/style.css">
 </head>
-<body class="bg-gray-50 antialiased" x-data="app" x-init="init()">
+<body class="bg-gray-50 dark:bg-gray-950 antialiased" x-data="app" x-init="init()">
     <div class="flex h-screen overflow-hidden">
 
         <!-- Sidebar -->
-        <aside class="w-56 bg-white border-r border-gray-200 flex flex-col shrink-0">
-            <div class="p-4 border-b border-gray-200">
-                <h1 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+        <aside class="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col shrink-0">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-800">
+                <h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                     <span>🔄</span> CommHub
                 </h1>
                 <p class="text-xs text-gray-400" x-show="health" x-text="'v' + health.version"></p>
             </div>
+
             <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto">
                 <template x-for="link in sidebarLinks.slice(0, 5)" :key="link.id">
                     <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors"
-                       :class="page === link.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+                       :class="page === link.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'"
                        @click.prevent="navigate(link.id)">
                         <span x-text="link.icon"></span>
                         <span x-text="link.label"></span>
+                        <span x-show="link.id === 'inbox' && unreadCount > 0" class="ml-auto bg-blue-600 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center" x-text="unreadCount"></span>
                     </a>
                 </template>
             </nav>
-            <div class="border-t border-gray-200 pt-2 pb-2 px-2 space-y-0.5">
+
+            <div class="border-t border-gray-200 dark:border-gray-800 pt-2 pb-2 px-2 space-y-0.5">
                 <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors"
-                   :class="page === 'automation' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
-                   @click.prevent="navigate('automation')">
-                    <span>⚡</span><span>Automation</span>
-                </a>
+                   :class="page === 'automation' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'"
+                   @click.prevent="navigate('automation')">⚡ Automation</a>
                 <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors"
-                   :class="page === 'settings' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
-                   @click.prevent="navigate('settings')">
-                    <span>⚙️</span><span>Settings</span>
-                </a>
+                   :class="page === 'settings' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'"
+                   @click.prevent="navigate('settings')">⚙️ Settings</a>
             </div>
-            <div class="p-3 border-t border-gray-200 flex items-center gap-2 text-xs text-gray-400">
-                <span class="w-2 h-2 rounded-full" :class="health ? 'bg-green-500' : 'bg-red-500'"></span>
-                <span x-text="health ? 'Connected' : 'Disconnected'"></span>
+
+            <div class="p-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-xs text-gray-400">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full" :class="health ? 'bg-green-500' : 'bg-red-500'"></span>
+                    <span x-text="health ? 'Connected' : 'Disconnected'"></span>
+                </div>
+                <button @click="toggleDarkMode" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-base leading-none" x-html="darkMode ? '&#x263E;' : '&#x2600;'"></button>
             </div>
         </aside>
 
         <!-- Main -->
-        <main class="flex-1 flex flex-col overflow-hidden">
+        <main class="flex-1 flex flex-col overflow-hidden dark:bg-gray-950">
 
             <!-- Top Bar -->
-            <header class="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between shrink-0">
-                <h2 class="text-base font-semibold text-gray-900">
+            <header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2 flex items-center justify-between shrink-0">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">
                     <span x-show="['inbox','sent','drafts','starred'].includes(page)" x-text="page.charAt(0).toUpperCase() + page.slice(1)"></span>
                     <span x-show="page === 'calendar'">Calendar</span>
                     <span x-show="page === 'automation'">Automation</span>
                     <span x-show="page === 'settings'">Settings</span>
                 </h2>
                 <div class="flex items-center gap-2">
-                    <button @click="aiPanelOpen = !aiPanelOpen" class="px-2.5 py-1.5 border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 flex items-center gap-1">AI</button>
-                    <button @click="navigate('settings')" class="px-2.5 py-1.5 border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 flex items-center gap-1">Settings</button>
+                    <button @click="aiPanelOpen = !aiPanelOpen" class="px-2.5 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-xs rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">AI</button>
+                    <button @click="navigate('settings')" class="px-2.5 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-xs rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">Settings</button>
                     <button @click="openCompose()" class="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700" x-show="page !== 'settings' && page !== 'automation' && page !== 'calendar'">+ Compose</button>
                 </div>
             </header>
 
+            <!-- Content -->
             <div class="flex-1 flex overflow-hidden">
-                <div class="flex-1 overflow-hidden flex flex-col">
+                <div class="flex-1 overflow-y-auto p-4 dark:text-gray-300">
 
-                    <!-- Inbox / Sent / Drafts / Starred -->
-                    <template x-for="folderPage in ['inbox','sent','drafts','starred']" :key="folderPage">
-                        <div x-show="!loading && page === folderPage" class="flex-1 flex overflow-hidden">
-                            <!-- Email list -->
-                            <div class="w-full flex flex-col overflow-hidden" :class="{ 'border-r border-gray-200': selectedEmail }">
-                                <div x-show="emails.length === 0" class="flex-1 flex flex-col items-center justify-center text-center p-8">
-                                    <div class="text-5xl mb-4">📭</div>
-                                    <p class="text-base text-gray-500 mb-4">Your inbox is empty</p>
-                                    <p class="text-sm text-gray-400 mb-6">Add demo data to test the app while OAuth is pending.</p>
-                                    <button @click="seedData" class="px-6 py-3 bg-purple-600 text-white text-base rounded-xl hover:bg-purple-700 shadow-sm font-medium">🌱 Seed Demo Data</button>
-                                </div>
-                                <div x-show="emails.length > 0" class="flex-1 overflow-y-auto divide-y divide-gray-50">
-                                    <template x-for="email in emails" :key="email.id">
-                                        <div @click="selectEmail(email)"
-                                             class="flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-gray-50 border-l-2"
-                                             :class="[email.is_read ? 'border-l-transparent bg-white' : 'border-l-blue-500 bg-blue-50/30', selectedEmail?.id === email.id ? 'bg-blue-50' : '']">
-                                            <button @click.stop="toggleStar(email)" class="shrink-0 text-sm mt-0.5" :class="email.is_starred ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'">⭐</button>
-                                            <div class="flex-1 min-w-0">
-                                                <div class="flex items-baseline justify-between gap-2">
-                                                    <span class="text-sm font-medium truncate" :class="email.is_read ? 'text-gray-700' : 'text-gray-900'" x-text="email.from_name || email.from_address"></span>
-                                                    <span class="text-xs text-gray-400 shrink-0" x-text="formatDate(email.received_at)"></span>
-                                                </div>
-                                                <div class="text-sm truncate" :class="email.is_read ? 'text-gray-500' : 'text-gray-800 font-medium'" x-text="email.subject"></div>
-                                                <div class="text-xs text-gray-400 truncate" x-text="truncate(email.body_text, 80)"></div>
-                                            </div>
-                                        </div>
-                                    </template>
+                    <!-- INBOX -->
+                    <section x-show="page === 'inbox' && emails.length === 0" class="flex flex-col items-center justify-center text-center py-16">
+                        <div class="text-5xl mb-4">📭</div>
+                        <p class="text-lg text-gray-500 mb-2">Your inbox is empty</p>
+                        <p class="text-sm text-gray-400 mb-6">Add demo data to test the app.</p>
+                        <button @click="seedData" class="px-6 py-3 bg-purple-600 text-white text-base rounded-xl hover:bg-purple-700 shadow-sm font-medium">🌱 Seed Demo Data</button>
+                    </section>
+
+                    <section x-show="page === 'inbox' && emails.length > 0" class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <template x-for="email in emails" :key="email.id">
+                            <div @click="selectEmail(email)"
+                                 class="flex items-start gap-3 px-3 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 border-l-2"
+                                 :class="[email.is_read ? 'border-l-transparent' : 'border-l-blue-500 bg-blue-50/30 dark:bg-blue-900/20', selectedEmail?.id === email.id ? 'bg-blue-50 dark:bg-blue-900/30' : '']">
+                                <button @click.stop="toggleStar(email)" class="shrink-0 text-sm mt-0.5" :class="email.is_starred ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'">⭐</button>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-baseline justify-between gap-2">
+                                        <span class="text-sm font-medium truncate" :class="email.is_read ? 'text-gray-700 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'" x-text="email.from_name || email.from_address"></span>
+                                        <span class="text-xs text-gray-400 shrink-0" x-text="formatDate(email.received_at)"></span>
+                                    </div>
+                                    <div class="text-sm truncate" :class="email.is_read ? 'text-gray-500' : 'text-gray-800 dark:text-gray-200 font-medium'" x-text="email.subject"></div>
+                                    <div class="text-xs text-gray-400 truncate" x-text="truncate(email.body_text, 80)"></div>
                                 </div>
                             </div>
-                            <!-- Email detail -->
-                            <div x-show="selectedEmail" class="w-2/5 flex flex-col overflow-hidden bg-white">
-                                <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                                    <button @click="closeEmailDetail" class="text-xs text-gray-500 hover:text-gray-700">&larr; Back</button>
-                                    <div class="flex items-center gap-2">
-                                        <button @click="toggleStar(selectedEmail)" class="text-sm" :class="selectedEmail.is_starred ? 'text-yellow-400' : 'text-gray-400'">⭐</button>
-                                        <button @click="deleteEmail(selectedEmail.id)" class="text-xs text-red-500 hover:text-red-700">🗑️</button>
+                        </template>
+                    </section>
+
+                    <!-- SENT / DRAFTS / STARRED -->
+                    <section x-show="['sent','drafts','starred'].includes(page) && emails.length === 0" class="flex flex-col items-center justify-center text-center py-16">
+                        <p class="text-gray-400">No emails here yet.</p>
+                    </section>
+                    <section x-show="['sent','drafts','starred'].includes(page) && emails.length > 0" class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <template x-for="email in emails" :key="email.id">
+                            <div @click="selectEmail(email)"
+                                 class="flex items-start gap-3 px-3 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <button @click.stop="toggleStar(email)" class="shrink-0 text-sm mt-0.5" :class="email.is_starred ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'">⭐</button>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-baseline justify-between gap-2">
+                                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate" x-text="email.from_name || email.from_address"></span>
+                                        <span class="text-xs text-gray-400 shrink-0" x-text="formatDate(email.received_at)"></span>
                                     </div>
+                                    <div class="text-sm text-gray-500 dark:text-gray-400 truncate" x-text="email.subject"></div>
                                 </div>
-                                <div class="flex-1 overflow-y-auto p-4">
-                                    <h3 class="text-base font-semibold text-gray-900 mb-3" x-text="selectedEmail.subject"></h3>
-                                    <div class="text-xs text-gray-500 mb-4 space-y-0.5">
-                                        <div><span class="text-gray-400">From:</span> <span x-text="selectedEmail.from_name || selectedEmail.from_address"></span> <span class="text-gray-300" x-show="selectedEmail.from_name">&lt;<span x-text="selectedEmail.from_address"></span>&gt;</span></div>
-                                        <div><span class="text-gray-400">To:</span> <span x-text="selectedEmail.to_addresses"></span></div>
-                                        <div><span class="text-gray-400">Date:</span> <span x-text="new Date(selectedEmail.received_at).toLocaleString()"></span></div>
-                                    </div>
-                                    <div class="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed" x-text="selectedEmail.body_text"></div>
-                                    <div class="mt-6 pt-4 border-t border-gray-100">
-                                        <button @click="openCompose(); composeForm.to = selectedEmail.from_address; composeForm.subject = 'Re: ' + selectedEmail.subject" class="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">↩ Reply</button>
-                                        <button @click="aiInput = selectedEmail.body_text; aiPanelOpen = true" class="ml-2 text-xs px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200">🤖 AI Actions</button>
-                                    </div>
-                                </div>
+                            </div>
+                        </template>
+                    </section>
+
+                    <!-- EMAIL DETAIL (shown below the list) -->
+                    <section x-show="selectedEmail" class="border-t border-gray-200 dark:border-gray-800 mt-2 pt-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <button @click="closeEmailDetail" class="text-sm text-blue-600 hover:text-blue-800">&larr; Back to list</button>
+                            <div class="flex gap-2">
+                                <button @click="toggleStar(selectedEmail)" class="text-sm" :class="selectedEmail.is_starred ? 'text-yellow-400' : 'text-gray-400'">⭐</button>
+                                <button @click="deleteEmail(selectedEmail.id)" class="text-sm text-red-500">🗑️</button>
                             </div>
                         </div>
-                    </template>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3" x-text="selectedEmail.subject"></h3>
+                        <div class="text-sm text-gray-500 dark:text-gray-400 mb-4 space-y-0.5">
+                            <div><span class="text-gray-400">From:</span> <span x-text="selectedEmail.from_name || selectedEmail.from_address"></span> <span class="text-gray-300" x-show="selectedEmail.from_name">&lt;<span x-text="selectedEmail.from_address"></span>&gt;</span></div>
+                            <div><span class="text-gray-400">To:</span> <span x-text="selectedEmail.to_addresses"></span></div>
+                            <div><span class="text-gray-400">Date:</span> <span x-text="new Date(selectedEmail.received_at).toLocaleString()"></span></div>
+                        </div>
+                        <div class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed" x-text="selectedEmail.body_text"></div>
+                        <div class="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex gap-2">
+                            <button @click="openCompose(); composeForm.to = selectedEmail.from_address; composeForm.subject = 'Re: ' + selectedEmail.subject" class="text-sm px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">↩ Reply</button>
+                            <button @click="aiInput = selectedEmail.body_text; aiPanelOpen = true" class="text-sm px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60">🤖 AI</button>
+                        </div>
+                    </section>
 
-                    <!-- Calendar -->
-                    <div x-show="!loading && page === 'calendar'" class="flex-1 flex flex-col overflow-hidden p-4">
+                    <!-- CALENDAR -->
+                    <section x-show="page === 'calendar'" x-init="loadCalendarEvents()">
                         <div class="flex items-center justify-between mb-4">
-                            <div class="flex items-center gap-2">
-                                <h3 class="text-base font-semibold text-gray-900" x-text="calendarWeekLabel()"></h3>
-                            </div>
-                            <div class="text-xs text-gray-400">
-                                <span x-text="events.length"></span> events this week
-                            </div>
+                            <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100" x-text="calendarWeekLabel()"></h3>
+                            <span class="text-xs text-gray-400" x-text="events.length + ' events'"></span>
                         </div>
-                        <div class="flex-1 overflow-y-auto">
-                            <div class="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
-                                <template x-for="(day, idx) in calendarDays" :key="idx">
-                                    <div class="bg-white min-h-[120px] p-2"
-                                         :class="isToday(day.date) ? 'bg-blue-50/50' : ''">
-                                        <div class="flex items-center justify-between mb-1">
-                                            <span class="text-xs font-medium text-gray-500" x-text="dayName(day.date)"></span>
-                                            <span class="text-xs font-semibold" :class="isToday(day.date) ? 'bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center' : 'text-gray-700'" x-text="dayNum(day.date)"></span>
-                                        </div>
-                                        <div class="space-y-1">
-                                            <template x-for="evt in day.events" :key="evt.id">
-                                                <div @click="editEvent(evt)" class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 truncate cursor-pointer hover:bg-blue-200" x-text="evt.title"></div>
-                                            </template>
-                                            <button @click="openNewEvent(day)" class="text-xs text-gray-400 hover:text-blue-600 w-full text-left px-1 py-0.5 rounded hover:bg-blue-50">+</button>
-                                        </div>
+                        <div class="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden">
+                            <template x-for="(day, idx) in calendarDays" :key="idx">
+                                <div class="bg-white dark:bg-gray-900 min-h-[100px] p-2" :class="isToday(day.date) ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400" x-text="dayName(day.date)"></span>
+                                        <span class="text-xs font-semibold" :class="isToday(day.date) ? 'bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center' : 'text-gray-700 dark:text-gray-300'" x-text="dayNum(day.date)"></span>
                                     </div>
-                                </template>
-                            </div>
-                        </div>
-                        <!-- Event Form Modal -->
-                        <div x-show="eventFormOpen" class="fixed inset-0 bg-black/20 z-50 flex items-center justify-center" @click.self="closeEventForm">
-                            <div class="bg-white rounded-xl shadow-xl p-5 w-96">
-                                <h4 class="font-medium text-gray-900 mb-4" x-text="editingEventId ? 'Edit Event' : 'New Event'"></h4>
-                                <div class="space-y-3">
-                                    <div><input type="text" x-model="eventForm.title" placeholder="Event title" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
-                                    <div><textarea x-model="eventForm.description" placeholder="Description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea></div>
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <div><label class="block text-xs text-gray-500 mb-1">Start</label><input type="datetime-local" x-model="eventForm.start_time" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
-                                        <div><label class="block text-xs text-gray-500 mb-1">End</label><input type="datetime-local" x-model="eventForm.end_time" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
-                                    </div>
-                                    <div class="flex gap-2 pt-2">
-                                        <button @click="saveEvent()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Save</button>
-                                        <button @click="closeEventForm()" class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-100">Cancel</button>
-                                        <button @click="deleteEvent(editingEventId)" x-show="editingEventId" class="px-4 py-2 text-red-500 text-sm rounded-lg hover:bg-red-50 ml-auto">Delete</button>
+                                    <div class="space-y-1">
+                                        <template x-for="evt in day.events" :key="evt.id">
+                                            <div @click="editEvent(evt)" class="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 truncate cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900/60" x-text="evt.title"></div>
+                                        </template>
+                                        <button @click="openNewEvent(day)" class="text-xs text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 w-full text-left px-1 py-0.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20">+</button>
                                     </div>
                                 </div>
-                            </div>
+                            </template>
                         </div>
-                    </div>
+                    </section>
 
-                    <!-- Automation -->
-                    <div x-show="!loading && page === 'automation'" class="flex-1 overflow-y-auto p-6">
-                        <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-medium text-gray-900">Automation Rules</h3><button @click="openNewRule()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">+ New Rule</button></div>
-                        <div class="space-y-2 max-w-2xl">
+                    <!-- AUTOMATION -->
+                    <section x-show="page === 'automation'" class="max-w-2xl">
+                        <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Automation Rules</h3><button @click="openNewRule()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">+ New Rule</button></div>
+                        <div class="space-y-2 mb-6">
                             <template x-for="rule in automationRules" :key="rule.id">
-                                <div class="border border-gray-200 rounded-lg p-3">
+                                <div class="border border-gray-200 dark:border-gray-800 rounded-lg p-3 dark:bg-gray-900/50">
                                     <div class="flex items-start justify-between">
                                         <div>
-                                            <div class="flex items-center gap-2"><span class="font-medium text-sm text-gray-900" x-text="rule.name"></span><span class="text-xs px-1.5 py-0.5 rounded-full" :class="rule.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" x-text="rule.is_enabled ? 'Active' : 'Disabled'"></span></div>
-                                            <div class="text-xs text-gray-500 mt-1 flex items-center gap-2"><span x-html="triggerTypeLabel(rule.trigger_type)"></span><span>→</span><span x-html="actionTypeLabel(rule.action_type)"></span><span x-show="rule.cron_schedule" class="font-mono">· <span x-text="rule.cron_schedule"></span></span></div>
+                                            <div class="flex items-center gap-2"><span class="font-medium text-sm dark:text-gray-200" x-text="rule.name"></span><span class="text-xs px-1.5 py-0.5 rounded-full" :class="rule.is_enabled ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'" x-text="rule.is_enabled ? 'Active' : 'Disabled'"></span></div>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2"><span x-html="triggerTypeLabel(rule.trigger_type)"></span><span>→</span><span x-html="actionTypeLabel(rule.action_type)"></span><span x-show="rule.cron_schedule">· <span class="font-mono" x-text="rule.cron_schedule"></span></span></div>
                                         </div>
-                                        <div class="flex gap-1 shrink-0 ml-3">
-                                            <button @click="toggleRule(rule.id)" class="px-2 py-1 text-xs rounded hover:bg-gray-100" :class="rule.is_enabled ? 'text-yellow-600' : 'text-green-600'" x-text="rule.is_enabled ? 'Disable' : 'Enable'"></button>
-                                            <button @click="editRule(rule)" class="px-2 py-1 text-xs text-gray-500 rounded hover:bg-gray-100">Edit</button>
-                                            <button @click="deleteRule(rule.id)" class="px-2 py-1 text-xs text-red-500 rounded hover:bg-red-50">Delete</button>
-                                        </div>
+                                        <div class="flex gap-1"><button @click="toggleRule(rule.id)" class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800" :class="rule.is_enabled ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'" x-text="rule.is_enabled ? 'Disable' : 'Enable'"></button><button @click="editRule(rule)" class="px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-gray-800">Edit</button><button @click="deleteRule(rule.id)" class="px-2 py-1 text-xs text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button></div>
                                     </div>
                                 </div>
                             </template>
                             <div x-show="automationRules.length === 0" class="text-sm text-gray-400 py-8 text-center">No rules yet.</div>
                         </div>
-                        <!-- Rule Form -->
-                        <div x-show="ruleFormOpen" class="border border-gray-200 rounded-lg p-4 bg-gray-50 mt-4 max-w-lg">
-                            <h4 class="font-medium text-sm text-gray-900 mb-3" x-text="ruleFormEdit ? 'Edit Rule' : 'New Rule'"></h4>
+                        <div x-show="ruleFormOpen" class="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50 mb-6">
+                            <h4 class="font-medium text-sm mb-3 dark:text-gray-200" x-text="ruleFormEdit ? 'Edit Rule' : 'New Rule'"></h4>
                             <div class="space-y-2">
-                                <input type="text" x-model="ruleForm.name" placeholder="Rule name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <input type="text" x-model="ruleForm.name" placeholder="Rule name" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200">
                                 <div class="grid grid-cols-2 gap-2">
-                                    <select x-model="ruleForm.trigger_type" class="px-3 py-2 border border-gray-300 rounded-lg text-sm"><template x-for="t in triggerTypes" :key="t"><option :value="t" x-text="t"></option></template></select>
-                                    <select x-model="ruleForm.action_type" class="px-3 py-2 border border-gray-300 rounded-lg text-sm"><template x-for="a in actionTypes" :key="a"><option :value="a" x-text="a"></option></template></select>
+                                    <select x-model="ruleForm.trigger_type" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200"><template x-for="t in triggerTypes" :key="t"><option :value="t" x-text="t"></option></template></select>
+                                    <select x-model="ruleForm.action_type" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200"><template x-for="a in actionTypes" :key="a"><option :value="a" x-text="a"></option></template></select>
                                 </div>
-                                <div x-show="ruleForm.trigger_type === 'cron_schedule'"><input type="text" x-model="ruleForm.cron_schedule" placeholder="*/5 * * * *" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"></div>
-                                <div x-show="ruleForm.action_type === 'auto_reply'"><textarea x-model="ruleForm.action_config.body" rows="2" placeholder="Auto-reply body..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea></div>
-                                <div x-show="ruleForm.action_type === 'forward'"><input type="text" x-model="ruleForm.action_config.to" placeholder="forward@example.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
-                                <div class="flex gap-2 pt-1"><button @click="saveRule()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Save</button><button @click="closeRuleForm()" class="px-3 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-100">Cancel</button></div>
+                                <div x-show="ruleForm.trigger_type === 'cron_schedule'"><input type="text" x-model="ruleForm.cron_schedule" placeholder="*/5 * * * *" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-mono bg-white dark:bg-gray-800 dark:text-gray-200"></div>
+                                <div x-show="ruleForm.action_type === 'auto_reply'"><textarea x-model="ruleForm.action_config.body" rows="2" placeholder="Auto-reply body..." class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200"></textarea></div>
+                                <div x-show="ruleForm.action_type === 'forward'"><input type="text" x-model="ruleForm.action_config.to" placeholder="forward@example.com" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200"></div>
+                                <div class="flex gap-2 pt-1"><button @click="saveRule()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Save</button><button @click="closeRuleForm()" class="px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">Cancel</button></div>
                             </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <!-- Settings -->
-                    <div x-show="!loading && page === 'settings'" class="flex-1 overflow-y-auto p-6 max-w-3xl">
-                        <section class="mb-8">
-                            <h3 class="text-base font-medium text-gray-900 mb-3">Demo Data</h3>
-                            <p class="text-sm text-gray-500 mb-3">Seed the database with fake emails and calendar events to test the app while OAuth is pending.</p>
-                            <button @click="seedData" class="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700">🌱 Seed Demo Data</button>
-                        </section>
-                        <section class="mb-8">
-                            <h3 class="text-base font-medium text-gray-900 mb-3">Connected Accounts</h3>
-                            <div class="bg-gray-50 rounded-lg p-4 text-center text-sm text-gray-400">OAuth setup pending (GitHub Education Plan). Using demo data for now.</div>
-                        </section>
-                        <section>
-                            <div class="flex items-center justify-between mb-3"><h3 class="text-base font-medium text-gray-900">AI Providers</h3><span class="text-xs text-gray-400" x-text="aiActiveLabel ? 'Active: ' + aiActiveLabel : 'No active provider'"></span></div>
+                    <!-- SETTINGS -->
+                    <section x-show="page === 'settings'" class="max-w-2xl">
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Settings</h3>
+
+                        <div class="mb-8 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-5">
+                            <h4 class="font-medium text-purple-900 dark:text-purple-300 mb-2">🌱 Demo Data</h4>
+                            <p class="text-sm text-purple-700 dark:text-purple-400 mb-4">Populate the app with sample emails and calendar events to test everything while real account integration is pending.</p>
+                            <button @click="seedData" class="px-5 py-2.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 font-medium shadow-sm">🌱 Seed Demo Data Now</button>
+                        </div>
+
+                        <div class="mb-8">
+                            <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Connected Accounts</h4>
+                            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-sm text-gray-400 dark:text-gray-500">No accounts connected yet. OAuth setup is on hold until your GitHub Education Plan is approved.</div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-3"><h4 class="font-medium text-gray-900 dark:text-gray-100">AI Providers</h4><span class="text-xs text-gray-400" x-text="aiActiveLabel ? 'Active: ' + aiActiveLabel : ''"></span></div>
                             <div class="space-y-2 mb-4">
                                 <template x-for="cfg in aiConfigs" :key="cfg.provider_type">
-                                    <div class="border border-gray-200 rounded-lg p-3 flex items-center justify-between" :class="{ 'ring-2 ring-blue-400': cfg.is_active }">
-                                        <div><div class="text-sm font-medium text-gray-900" x-text="cfg.display_name"></div><div class="text-xs text-gray-500"><span x-text="cfg.provider_type"></span> · <span x-text="cfg.model || 'default'"></span><span x-show="cfg.is_active" class="ml-2 text-blue-600 font-medium">● Active</span></div></div>
-                                        <div class="flex gap-1"><button @click="editAiConfig(cfg)" class="text-xs text-gray-500 px-2 py-1 rounded hover:bg-gray-100">Edit</button><button @click="activateAiProvider(cfg.provider_type)" class="text-xs text-blue-600 px-2 py-1 rounded hover:bg-blue-50" x-show="!cfg.is_active">Activate</button><button @click="deleteAiConfig(cfg.provider_type)" class="text-xs text-red-500 px-2 py-1 rounded hover:bg-red-50">Delete</button></div>
+                                    <div class="border border-gray-200 dark:border-gray-800 rounded-lg p-3 flex items-center justify-between dark:bg-gray-900/50" :class="{ 'ring-2 ring-blue-400': cfg.is_active }">
+                                        <div><div class="text-sm font-medium dark:text-gray-200" x-text="cfg.display_name"></div><div class="text-xs text-gray-500 dark:text-gray-400"><span x-text="cfg.provider_type"></span> · <span x-text="cfg.model || 'default'"></span><span x-show="cfg.is_active" class="ml-2 text-blue-600 dark:text-blue-400">● Active</span></div></div>
+                                        <div class="flex gap-1"><button @click="editAiConfig(cfg)" class="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">Edit</button><button @click="activateAiProvider(cfg.provider_type)" class="text-xs text-blue-600 dark:text-blue-400 px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20" x-show="!cfg.is_active">Activate</button><button @click="deleteAiConfig(cfg.provider_type)" class="text-xs text-red-500 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button></div>
                                     </div>
                                 </template>
-                                <div x-show="aiConfigs.length === 0" class="bg-gray-50 rounded-lg p-4 text-center text-sm text-gray-400">No AI providers configured.</div>
+                                <div x-show="aiConfigs.length === 0" class="text-sm text-gray-400 py-4 text-center">No AI providers configured.</div>
                             </div>
-                            <div x-show="unconfiguredProviders.length > 0" class="flex flex-wrap gap-2 mb-4"><template x-for="p in unconfiguredProviders" :key="p"><button @click="openNewAiConfig(p)" class="px-3 py-1.5 border border-dashed border-gray-300 text-xs text-gray-600 rounded-lg hover:border-blue-400 hover:text-blue-600" x-text="'+ ' + p"></button></template></div>
-                            <div x-show="aiFormOpen" class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                <h4 class="font-medium text-sm text-gray-900 mb-3" x-text="aiFormEdit ? 'Edit' : 'New'"></h4>
+                            <div x-show="unconfiguredProviders.length > 0" class="flex flex-wrap gap-2 mb-4"><template x-for="p in unconfiguredProviders" :key="p"><button @click="openNewAiConfig(p)" class="px-3 py-1.5 border border-dashed border-gray-300 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-400 rounded-lg hover:border-blue-400 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-400">+ <span x-text="p"></span></button></template></div>
+                            <div x-show="aiFormOpen" class="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50">
+                                <h4 class="text-sm font-medium mb-3 dark:text-gray-200" x-text="aiFormEdit ? 'Edit' : 'New'"></h4>
                                 <div class="space-y-2 max-w-sm">
-                                    <input type="text" x-model="aiForm.display_name" placeholder="Display name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                                    <input type="password" x-model="aiForm.api_key" placeholder="API key" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                                    <input type="text" x-model="aiForm.base_url" placeholder="Base URL (optional)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                                    <div class="grid grid-cols-2 gap-2"><input type="text" x-model="aiForm.model" placeholder="Model" class="px-3 py-2 border border-gray-300 rounded-lg text-sm"><input type="number" step="0.1" x-model="aiForm.temperature" class="px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
-                                    <div class="flex gap-2 pt-1"><button @click="saveAiConfig()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Save</button><button @click="closeAiForm()" class="px-3 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-100">Cancel</button></div>
+                                    <input type="text" x-model="aiForm.display_name" placeholder="Display name" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200">
+                                    <input type="password" x-model="aiForm.api_key" placeholder="API key" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200">
+                                    <input type="text" x-model="aiForm.base_url" placeholder="Base URL (optional)" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200">
+                                    <div class="grid grid-cols-2 gap-2"><input type="text" x-model="aiForm.model" placeholder="Model" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200"><input type="number" step="0.1" x-model="aiForm.temperature" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200"></div>
+                                    <div class="flex gap-2 pt-1"><button @click="saveAiConfig()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Save</button><button @click="closeAiForm()" class="px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">Cancel</button></div>
                                     <div x-show="aiError" class="text-xs text-red-500" x-text="aiError"></div>
                                 </div>
                             </div>
-                        </section>
-                    </div>
+                        </div>
+                    </section>
 
                 </div>
 
                 <!-- AI Assistant Panel -->
-                <div x-show="aiPanelOpen" class="w-80 border-l border-gray-200 bg-white flex flex-col overflow-hidden shrink-0">
-                    <div class="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
-                        <h3 class="text-sm font-medium text-gray-900">🤖 AI Assistant</h3>
-                        <button @click="aiPanelOpen = false" class="text-gray-400 hover:text-gray-600">&times;</button>
+                <div x-show="aiPanelOpen" class="w-80 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col overflow-hidden shrink-0">
+                    <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                        <h3 class="text-sm font-medium dark:text-gray-100">🤖 AI Assistant</h3>
+                        <button @click="aiPanelOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">&times;</button>
                     </div>
                     <div class="flex-1 overflow-y-auto p-3 space-y-3">
-                        <textarea x-model="aiInput" rows="5" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none" placeholder="Paste email text or type a prompt..."></textarea>
+                        <textarea x-model="aiInput" rows="5" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm resize-none bg-white dark:bg-gray-800 dark:text-gray-200" placeholder="Paste email text or type a prompt..."></textarea>
                         <div class="flex flex-wrap gap-1.5">
-                            <button @click="aiAction('draft')" class="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200">✏️ Draft</button>
-                            <button @click="aiAction('summarize')" class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg hover:bg-green-200">📋 Summarize</button>
-                            <button @click="aiAction('categorize')" class="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-lg hover:bg-orange-200">🏷️ Categorize</button>
-                            <button @click="aiAction('chat')" class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-lg hover:bg-gray-200">💬 Chat</button>
+                            <button @click="aiAction('draft')" class="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-xs rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60">✏️ Draft</button>
+                            <button @click="aiAction('summarize')" class="px-2 py-1 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs rounded-lg hover:bg-green-200 dark:hover:bg-green-900/60">📋 Summarize</button>
+                            <button @click="aiAction('categorize')" class="px-2 py-1 bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-xs rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/60">🏷️ Categorize</button>
+                            <button @click="aiAction('chat')" class="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">💬 Chat</button>
                         </div>
-                        <div x-show="aiToneSelector">
-                            <select x-model="aiTone" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs"><option value="professional">Professional</option><option value="friendly">Friendly</option><option value="formal">Formal</option><option value="casual">Casual</option></select>
-                        </div>
+                        <div x-show="aiToneSelector"><select x-model="aiTone" class="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs bg-white dark:bg-gray-800 dark:text-gray-200"><option value="professional">Professional</option><option value="friendly">Friendly</option><option value="formal">Formal</option><option value="casual">Casual</option></select></div>
                         <div x-show="aiLoading" class="text-center text-xs text-gray-400 py-3">🤔 Thinking...</div>
-                        <div x-show="aiResult" class="bg-gray-50 rounded-lg p-3">
+                        <div x-show="aiResult" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                             <div class="text-xs text-gray-400 mb-1" x-text="'via ' + aiResultProvider"></div>
-                            <div class="text-sm text-gray-800 whitespace-pre-wrap" x-text="aiResult"></div>
+                            <div class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap" x-text="aiResult"></div>
                             <button @click="copyAiResult()" class="mt-1 text-xs text-blue-600">📋 Copy</button>
                         </div>
-                        <div x-show="aiError" class="bg-red-50 text-red-600 text-xs rounded-lg p-2" x-text="aiError"></div>
+                        <div x-show="aiError" class="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs rounded-lg p-2" x-text="aiError"></div>
                     </div>
                 </div>
             </div>
         </main>
 
         <!-- Compose Modal -->
-        <div x-show="composeOpen" class="fixed inset-0 bg-black/20 z-50 flex items-center justify-center" @click.self="closeCompose">
-            <div class="bg-white rounded-xl shadow-xl p-5 w-[520px]">
+        <div x-show="composeOpen" class="fixed inset-0 bg-black/20 dark:bg-black/50 z-50 flex items-center justify-center" @click.self="closeCompose">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-xl p-5 w-[520px]">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="font-medium text-gray-900">New Message</h3>
-                    <button @click="closeCompose" class="text-gray-400 hover:text-gray-600">&times;</button>
+                    <h3 class="font-medium text-gray-900 dark:text-gray-100">New Message</h3>
+                    <button @click="closeCompose" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">&times;</button>
                 </div>
                 <div class="space-y-3">
-                    <div class="flex gap-2"><select x-model="composeForm.account_id" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"><template x-for="a in accountOptions" :key="a.value"><option :value="a.value" x-text="a.label"></option></template></select></div>
-                    <input type="text" x-model="composeForm.to" placeholder="To" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <input type="text" x-model="composeForm.subject" placeholder="Subject" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <textarea x-model="composeForm.body" rows="10" placeholder="Write your message..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"></textarea>
+                    <select x-model="composeForm.account_id" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200"><template x-for="a in accountOptions" :key="a.value"><option :value="a.value" x-text="a.label"></option></template></select>
+                    <input type="text" x-model="composeForm.to" placeholder="To" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200">
+                    <input type="text" x-model="composeForm.subject" placeholder="Subject" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200">
+                    <textarea x-model="composeForm.body" rows="8" placeholder="Write your message..." class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm resize-none bg-white dark:bg-gray-800 dark:text-gray-200"></textarea>
                     <div class="flex gap-2 pt-1">
                         <button @click="sendEmail()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Send</button>
-                        <button @click="saveDraft()" class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-100">Save Draft</button>
-                        <button @click="closeCompose" class="px-4 py-2 text-gray-500 text-sm rounded-lg hover:bg-gray-100 ml-auto">Discard</button>
+                        <button @click="saveDraft()" class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">Save Draft</button>
+                        <button @click="closeCompose" class="px-4 py-2 text-gray-500 dark:text-gray-400 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 ml-auto">Discard</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Form Modal -->
+        <div x-show="eventFormOpen" class="fixed inset-0 bg-black/20 dark:bg-black/50 z-50 flex items-center justify-center" @click.self="closeEventForm">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-xl p-5 w-96">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-4" x-text="editingEventId ? 'Edit Event' : 'New Event'"></h4>
+                <div class="space-y-3">
+                    <input type="text" x-model="eventForm.title" placeholder="Event title" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200">
+                    <textarea x-model="eventForm.description" placeholder="Description" rows="2" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200"></textarea>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Start</label><input type="datetime-local" x-model="eventForm.start_time" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200"></div>
+                        <div><label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">End</label><input type="datetime-local" x-model="eventForm.end_time" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200"></div>
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button @click="saveEvent()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Save</button>
+                        <button @click="closeEventForm()" class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">Cancel</button>
+                        <button @click="deleteEvent(editingEventId)" x-show="editingEventId" class="px-4 py-2 text-red-500 text-sm rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 ml-auto">Delete</button>
                     </div>
                 </div>
             </div>

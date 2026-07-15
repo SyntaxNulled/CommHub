@@ -19,8 +19,8 @@ class EmailAccount(Base):
     display_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     oauth_token_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
-    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), onupdate=lambda: datetime.datetime.now(datetime.UTC))
 
     emails: Mapped[list["Email"]] = relationship(back_populates="account", cascade="all, delete-orphan")
     calendar_events: Mapped[list["CalendarEvent"]] = relationship(back_populates="account", cascade="all, delete-orphan")
@@ -45,7 +45,7 @@ class Email(Base):
     is_starred: Mapped[bool] = mapped_column(Boolean, default=False)
     folder: Mapped[str] = mapped_column(String(128), default="INBOX")
     received_at: Mapped[datetime.datetime] = mapped_column(DateTime)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
 
     account: Mapped["EmailAccount"] = relationship(back_populates="emails")
 
@@ -62,7 +62,7 @@ class CalendarEvent(Base):
     start_time: Mapped[datetime.datetime] = mapped_column(DateTime)
     end_time: Mapped[datetime.datetime] = mapped_column(DateTime)
     is_all_day: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
 
     account: Mapped["EmailAccount"] = relationship(back_populates="calendar_events")
 
@@ -80,7 +80,7 @@ class AutomationRule(Base):
     action_type: Mapped[str] = mapped_column(String(64))
     action_config: Mapped[dict] = mapped_column(JSON, default=dict)
     cron_schedule: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
 
 
 class AIProviderConfig(Base):
@@ -96,5 +96,5 @@ class AIProviderConfig(Base):
     temperature: Mapped[float] = mapped_column(default=0.7)
     max_tokens: Mapped[int] = mapped_column(default=1024)
     extra_params: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
-    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), onupdate=lambda: datetime.datetime.now(datetime.UTC))

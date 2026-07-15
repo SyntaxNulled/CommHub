@@ -44,7 +44,7 @@ async def seed_demo_data():
         if existing.scalars().first():
             return {"status": "already_seeded"}
 
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.UTC)
 
         for acct_data in FAKE_ACCOUNTS:
             acct = EmailAccount(

@@ -3,20 +3,27 @@
 import sys
 import webbrowser
 import uvicorn
-from app.config import settings
+from pathlib import Path
 
 
 def main():
+    if getattr(sys, "frozen", False):
+        import app.config
+        app.config.settings.debug = False
+
+    from app.main import app
+    from app.config import settings
+
     url = f"http://{settings.host}:{settings.port}"
     print(f"  == CommHub v{settings.app_version} ==")
     print(f"  Opening {url}")
     webbrowser.open(url)
     uvicorn.run(
-        "app.main:app",
+        app,
         host=settings.host,
         port=settings.port,
-        reload=settings.debug,
-        log_level="info" if settings.debug else "warning",
+        reload=False,
+        log_level="warning",
     )
 
 
