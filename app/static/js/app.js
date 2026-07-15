@@ -27,6 +27,7 @@ document.addEventListener('alpine:init', () => {
         composeForm: { account_id: 1, to: '', subject: '', body: '' },
         searchQuery: '',
         searchFilter: 'all',
+        shortcutsOpen: false,
 
         // --- Calendar State ---
         events: [],
@@ -103,6 +104,7 @@ document.addEventListener('alpine:init', () => {
         // --- Init ---
         async init() {
             if (this.darkMode) document.documentElement.classList.add('dark');
+            window.addEventListener('keydown', (e) => this.handleKeydown(e));
             await this.checkHealth();
             await this.loadAccounts();
             await this.loadEmails();
@@ -142,6 +144,73 @@ document.addEventListener('alpine:init', () => {
                 this.currentFolder = pageId === 'starred' ? 'STARRED' : pageId.toUpperCase();
                 this.loadEmails();
             }
+        },
+
+        handleKeydown(e) {
+            const tag = e.target.tagName;
+            const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+            if (e.key === 'Escape') {
+                if (this.shortcutsOpen) { this.shortcutsOpen = false; return; }
+                if (this.composeOpen) { this.closeCompose(); return; }
+                if (this.eventFormOpen) { this.closeEventForm(); return; }
+                if (this.aiPanelOpen) { this.aiPanelOpen = false; return; }
+                if (this.selectedEmail) { this.closeEmailDetail(); return; }
+                return;
+            }
+
+            if (isInput) return;
+
+            if (e.key === '?') {
+                e.preventDefault();
+                this.shortcutsOpen = !this.shortcutsOpen;
+                return;
+            }
+
+            if (e.key === '/') {
+                e.preventDefault();
+                const search = document.querySelector('input[placeholder*="Search"]');
+                if (search) search.focus();
+                return;
+            }
+
+            if (e.key === 'c') {
+                if (['inbox','sent','drafts','starred'].includes(this.page)) {
+                    e.preventDefault();
+                    this.openCompose();
+                }
+                return;
+            }
+
+            if (e.key === 'r' && this.selectedEmail) {
+                e.preventDefault();
+                this.openCompose();
+                this.composeForm.to = this.selectedEmail.from_address;
+                this.composeForm.subject = 'Re: ' + this.selectedEmail.subject;
+                return;
+            }
+
+            if ((e.key === 'j' || e.key === 'ArrowDown') && ['inbox','sent','drafts','starred'].includes(this.page)) {
+                e.preventDefault();
+                this.navigateEmail(1);
+                return;
+            }
+
+            if ((e.key === 'k' || e.key === 'ArrowUp') && ['inbox','sent','drafts','starred'].includes(this.page)) {
+                e.preventDefault();
+                this.navigateEmail(-1);
+                return;
+            }
+        },
+
+        navigateEmail(direction) {
+            const list = this.filteredEmails;
+            if (!list.length) return;
+            let idx = this.selectedEmail ? list.findIndex(e => e.id === this.selectedEmail.id) : -1;
+            idx += direction;
+            if (idx < 0) idx = 0;
+            if (idx >= list.length) idx = list.length - 1;
+            this.selectEmail(list[idx]);
         },
 
         // --- Accounts ---
