@@ -97,76 +97,107 @@
                         <button @click="seedData" class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white text-base rounded-xl hover:bg-purple-700 shadow-sm font-medium transition-all duration-150"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.75 5.25h16.5M12 3v3m0 0v12m0 0H8.25m3.75 0h3.75"/></svg> Seed Demo Data</button>
                     </section>
 
-                    <section x-show="page === 'inbox' && emails.length > 0" class="divide-y divide-gray-100 dark:divide-gray-800">
-                        <template x-for="email in emails" :key="email.id">
-                            <div @click="selectEmail(email)"
-                                 class="flex items-start gap-3 px-3 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 border-l-2"
-                                 :class="[email.is_read ? 'border-l-transparent' : 'border-l-blue-500 bg-blue-50/30 dark:bg-blue-900/20', selectedEmail?.id === email.id ? 'bg-blue-50 dark:bg-blue-900/30' : '']">
-                                 <button @click.stop="toggleStar(email)" class="shrink-0 mt-0.5" :class="email.is_starred ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'">
-                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" x-show="email.is_starred"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" x-show="!email.is_starred"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                 </button>
-                                 <div class="flex-1 min-w-0">
-                                     <div class="flex items-baseline justify-between gap-2">
-                                         <span class="text-sm font-medium truncate" :class="email.is_read ? 'text-gray-700 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'" x-text="email.from_name || email.from_address"></span>
-                                         <span class="text-xs text-gray-400 shrink-0" x-text="formatDate(email.received_at)"></span>
+                    <!-- INBOX SPLIT VIEW -->
+                    <section x-show="page === 'inbox' && emails.length > 0" class="flex gap-4 h-full">
+                        <div class="divide-y divide-gray-100 dark:divide-gray-800 overflow-y-auto" :class="selectedEmail ? 'w-2/5 shrink-0' : 'w-full'">
+                            <template x-for="email in emails" :key="email.id">
+                                <div @click="selectEmail(email)"
+                                     class="flex items-start gap-3 px-3 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 border-l-2"
+                                     :class="[email.is_read ? 'border-l-transparent' : 'border-l-blue-500 bg-blue-50/30 dark:bg-blue-900/20', selectedEmail?.id === email.id ? 'bg-blue-50 dark:bg-blue-900/30' : '']">
+                                     <button @click.stop="toggleStar(email)" class="shrink-0 mt-0.5" :class="email.is_starred ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'">
+                                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" x-show="email.is_starred"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" x-show="!email.is_starred"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                     </button>
+                                     <div class="flex-1 min-w-0">
+                                         <div class="flex items-baseline justify-between gap-2">
+                                             <span class="text-sm font-medium truncate" :class="email.is_read ? 'text-gray-700 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'" x-text="email.from_name || email.from_address"></span>
+                                             <span class="text-xs text-gray-400 shrink-0" x-text="formatDate(email.received_at)"></span>
+                                         </div>
+                                         <div class="text-sm truncate" :class="email.is_read ? 'text-gray-500' : 'text-gray-800 dark:text-gray-200 font-medium'" x-text="email.subject"></div>
+                                         <div class="text-xs text-gray-400 truncate" x-text="truncate(email.body_text, 80)"></div>
                                      </div>
-                                     <div class="text-sm truncate" :class="email.is_read ? 'text-gray-500' : 'text-gray-800 dark:text-gray-200 font-medium'" x-text="email.subject"></div>
-                                     <div class="text-xs text-gray-400 truncate" x-text="truncate(email.body_text, 80)"></div>
-                                 </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- EMAIL DETAIL PANE -->
+                        <div x-show="selectedEmail" class="flex-1 overflow-y-auto border-l border-gray-200 dark:border-gray-800 pl-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <button @click="closeEmailDetail" class="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg> Back</button>
+                                <div class="flex gap-1">
+                                    <button @click="toggleStar(selectedEmail)" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" :class="selectedEmail.is_starred ? 'text-yellow-400' : 'text-gray-400'">
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" x-show="selectedEmail.is_starred"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" x-show="!selectedEmail.is_starred"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                    </button>
+                                    <button @click="deleteEmail(selectedEmail.id)" class="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </div>
                             </div>
-                        </template>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3" x-text="selectedEmail.subject"></h3>
+                            <div class="text-sm text-gray-500 dark:text-gray-400 mb-4 space-y-0.5">
+                                <div><span class="text-gray-400">From:</span> <span x-text="selectedEmail.from_name || selectedEmail.from_address"></span> <span class="text-gray-300" x-show="selectedEmail.from_name">&lt;<span x-text="selectedEmail.from_address"></span>&gt;</span></div>
+                                <div><span class="text-gray-400">To:</span> <span x-text="selectedEmail.to_addresses"></span></div>
+                                <div><span class="text-gray-400">Date:</span> <span x-text="new Date(selectedEmail.received_at).toLocaleString()"></span></div>
+                            </div>
+                            <div class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed" x-text="selectedEmail.body_text"></div>
+                            <div class="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex gap-2">
+                                <button @click="openCompose(); composeForm.to = selectedEmail.from_address; composeForm.subject = 'Re: ' + selectedEmail.subject" class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-150"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg> Reply</button>
+                                <button @click="aiInput = selectedEmail.body_text; aiPanelOpen = true" class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-all duration-150"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> AI</button>
+                            </div>
+                        </div>
                     </section>
 
-                    <!-- SENT / DRAFTS / STARRED -->
+                    <!-- SENT / DRAFTS / STARRED SPLIT VIEW -->
                     <section x-show="['sent','drafts','starred'].includes(page) && emails.length === 0" class="flex flex-col items-center justify-center text-center py-16">
                         <p class="text-gray-400">No emails here yet.</p>
                     </section>
-                    <section x-show="['sent','drafts','starred'].includes(page) && emails.length > 0" class="divide-y divide-gray-100 dark:divide-gray-800">
-                        <template x-for="email in emails" :key="email.id">
-                            <div @click="selectEmail(email)"
-                                 class="flex items-start gap-3 px-3 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                                 <button @click.stop="toggleStar(email)" class="shrink-0 mt-0.5" :class="email.is_starred ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'">
-                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" x-show="email.is_starred"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" x-show="!email.is_starred"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                 </button>
-                                 <div class="flex-1 min-w-0">
-                                     <div class="flex items-baseline justify-between gap-2">
-                                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate" x-text="email.from_name || email.from_address"></span>
-                                         <span class="text-xs text-gray-400 shrink-0" x-text="formatDate(email.received_at)"></span>
+                    <section x-show="['sent','drafts','starred'].includes(page) && emails.length > 0" class="flex gap-4 h-full">
+                        <div class="divide-y divide-gray-100 dark:divide-gray-800 overflow-y-auto" :class="selectedEmail ? 'w-2/5 shrink-0' : 'w-full'">
+                            <template x-for="email in emails" :key="email.id">
+                                <div @click="selectEmail(email)"
+                                     class="flex items-start gap-3 px-3 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                                     <button @click.stop="toggleStar(email)" class="shrink-0 mt-0.5" :class="email.is_starred ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'">
+                                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" x-show="email.is_starred"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" x-show="!email.is_starred"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                     </button>
+                                     <div class="flex-1 min-w-0">
+                                         <div class="flex items-baseline justify-between gap-2">
+                                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate" x-text="email.from_name || email.from_address"></span>
+                                             <span class="text-xs text-gray-400 shrink-0" x-text="formatDate(email.received_at)"></span>
+                                         </div>
+                                         <div class="text-sm text-gray-500 dark:text-gray-400 truncate" x-text="email.subject"></div>
                                      </div>
-                                     <div class="text-sm text-gray-500 dark:text-gray-400 truncate" x-text="email.subject"></div>
-                                 </div>
-                            </div>
-                        </template>
-                    </section>
+                                </div>
+                            </template>
+                        </div>
 
-                    <!-- EMAIL DETAIL (shown below the list) -->
-                     <section x-show="selectedEmail" class="border-t border-gray-200 dark:border-gray-800 mt-2 pt-4">
-                         <div class="flex items-center justify-between mb-3">
-                             <button @click="closeEmailDetail" class="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg> Back</button>
-                             <div class="flex gap-1">
-                                 <button @click="toggleStar(selectedEmail)" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" :class="selectedEmail.is_starred ? 'text-yellow-400' : 'text-gray-400'">
-                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" x-show="selectedEmail.is_starred"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" x-show="!selectedEmail.is_starred"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                 </button>
-                                 <button @click="deleteEmail(selectedEmail.id)" class="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
-                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                 </button>
-                             </div>
-                         </div>
-                         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3" x-text="selectedEmail.subject"></h3>
-                         <div class="text-sm text-gray-500 dark:text-gray-400 mb-4 space-y-0.5">
-                             <div><span class="text-gray-400">From:</span> <span x-text="selectedEmail.from_name || selectedEmail.from_address"></span> <span class="text-gray-300" x-show="selectedEmail.from_name">&lt;<span x-text="selectedEmail.from_address"></span>&gt;</span></div>
-                             <div><span class="text-gray-400">To:</span> <span x-text="selectedEmail.to_addresses"></span></div>
-                             <div><span class="text-gray-400">Date:</span> <span x-text="new Date(selectedEmail.received_at).toLocaleString()"></span></div>
-                         </div>
-                         <div class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed" x-text="selectedEmail.body_text"></div>
-                         <div class="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex gap-2">
-                             <button @click="openCompose(); composeForm.to = selectedEmail.from_address; composeForm.subject = 'Re: ' + selectedEmail.subject" class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-150"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg> Reply</button>
-                             <button @click="aiInput = selectedEmail.body_text; aiPanelOpen = true" class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-all duration-150"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> AI</button>
-                         </div>
-                     </section>
+                        <div x-show="selectedEmail" class="flex-1 overflow-y-auto border-l border-gray-200 dark:border-gray-800 pl-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <button @click="closeEmailDetail" class="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg> Back</button>
+                                <div class="flex gap-1">
+                                    <button @click="toggleStar(selectedEmail)" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" :class="selectedEmail.is_starred ? 'text-yellow-400' : 'text-gray-400'">
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" x-show="selectedEmail.is_starred"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" x-show="!selectedEmail.is_starred"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                    </button>
+                                    <button @click="deleteEmail(selectedEmail.id)" class="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3" x-text="selectedEmail.subject"></h3>
+                            <div class="text-sm text-gray-500 dark:text-gray-400 mb-4 space-y-0.5">
+                                <div><span class="text-gray-400">From:</span> <span x-text="selectedEmail.from_name || selectedEmail.from_address"></span> <span class="text-gray-300" x-show="selectedEmail.from_name">&lt;<span x-text="selectedEmail.from_address"></span>&gt;</span></div>
+                                <div><span class="text-gray-400">To:</span> <span x-text="selectedEmail.to_addresses"></span></div>
+                                <div><span class="text-gray-400">Date:</span> <span x-text="new Date(selectedEmail.received_at).toLocaleString()"></span></div>
+                            </div>
+                            <div class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed" x-text="selectedEmail.body_text"></div>
+                            <div class="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex gap-2">
+                                <button @click="openCompose(); composeForm.to = selectedEmail.from_address; composeForm.subject = 'Re: ' + selectedEmail.subject" class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-150"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg> Reply</button>
+                                <button @click="aiInput = selectedEmail.body_text; aiPanelOpen = true" class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-all duration-150"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> AI</button>
+                            </div>
+                        </div>
+                    </section>
 
                     <!-- CALENDAR -->
                     <section x-show="page === 'calendar'" x-init="loadCalendarEvents()">
@@ -299,7 +330,7 @@
 
         <!-- Compose Modal -->
         <div x-show="composeOpen" class="fixed inset-0 bg-black/40 dark:bg-black/70 z-50 flex items-center justify-center" @click.self="closeCompose">
-            <div class="glass rounded-xl shadow-2xl p-5 w-[520px] transition-all duration-200">
+            <div class="glass rounded-xl shadow-2xl p-5 w-[520px] max-w-[95vw] max-h-[85vh] overflow-y-auto transition-all duration-200">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-medium text-gray-900 dark:text-gray-100">New Message</h3>
                     <button @click="closeCompose" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-150">
@@ -322,7 +353,7 @@
 
         <!-- Event Form Modal -->
         <div x-show="eventFormOpen" class="fixed inset-0 bg-black/30 dark:bg-black/60 z-50 flex items-center justify-center" @click.self="closeEventForm">
-            <div class="glass rounded-xl shadow-2xl p-5 w-96 transition-all duration-200">
+            <div class="glass rounded-xl shadow-2xl p-5 w-96 max-w-[95vw] max-h-[85vh] overflow-y-auto transition-all duration-200">
                 <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-4" x-text="editingEventId ? 'Edit Event' : 'New Event'"></h4>
                 <div class="space-y-3">
                     <input type="text" x-model="eventForm.title" placeholder="Event title" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200">
