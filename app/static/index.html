@@ -52,9 +52,11 @@
                 <template x-for="link in mailLinks" :key="link.id">
                     <button type="button"
                             class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 cursor-pointer"
-                            :class="page === link.id ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'"
+                            :class="[page === link.id ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200', draggedEmailId ? 'ring-2 ring-blue-400/50' : '']"
                             :aria-current="page === link.id ? 'page' : null"
-                            @click="navigate(link.id)">
+                            @click="navigate(link.id)"
+                            @dragover="onDragOver($event)"
+                            @drop="onDrop(link.id === 'starred' ? 'STARRED' : link.id === 'snoozed' ? 'SNOOZED' : link.id.toUpperCase(), $event)">
                         <span class="shrink-0" x-html="iconSVG(link.icon)"></span>
                         <span x-text="link.label"></span>
                         <span x-show="link.id === 'inbox' && unreadTotal > 0"
@@ -76,9 +78,11 @@
                 <template x-for="folder in folders.filter(f => !f.is_system)" :key="folder.id">
                     <button type="button"
                             class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 cursor-pointer"
-                            :class="page === folder.normalized_name.toLowerCase() ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'"
+                            :class="[page === folder.normalized_name.toLowerCase() ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200', draggedEmailId ? 'ring-2 ring-blue-400/50' : '']"
                             :aria-current="page === folder.normalized_name.toLowerCase() ? 'page' : null"
-                            @click="navigate(folder.normalized_name.toLowerCase())">
+                            @click="navigate(folder.normalized_name.toLowerCase())"
+                            @dragover="onDragOver($event)"
+                            @drop="onDrop(folder.normalized_name, $event)">
                         <span class="shrink-0" x-html="folderIconSVG(folder.icon)"></span>
                         <span x-text="folder.name"></span>
                         <span class="ml-auto w-2 h-2 rounded-full" :style="'background-color: ' + (folderColorMap[folder.color] || folder.color || '#2563EB')"></span>
@@ -248,10 +252,14 @@
                                         <template x-for="email in filteredEmails" :key="email.id">
                                             <li>
                                                      <div role="button" tabindex="0"
-                                                      @click="selectEmail(email)"
-                                                      @keydown.enter="selectEmail(email)"
-                                                      @keydown.space.prevent="selectEmail(email)"
-                                                      class="group flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors duration-150 border-l-2 rounded-r-lg"
+                                                       @click="selectEmail(email)"
+                                                       @keydown.enter="selectEmail(email)"
+                                                       @keydown.space.prevent="selectEmail(email)"
+                                                       @contextmenu="openContextMenu(email, $event)"
+                                                       draggable="true"
+                                                       @dragstart="onDragStart(email, $event)"
+                                                       @dragend="onDragEnd()"
+                                                       class="group flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors duration-150 border-l-2 rounded-r-lg"
 
                                                      :class="[
                                                         email.is_read ? 'border-l-transparent' : 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/15',
@@ -1123,6 +1131,33 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- ============ Context Menu ============ -->
+        <div x-cloak x-show="contextMenu" class="fixed z-[80] w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg py-1 text-sm"
+             :style="'left: ' + (contextMenu?.x || 0) + 'px; top: ' + (contextMenu?.y || 0) + 'px'"
+             @click.stop>
+            <button @click="contextMenuToggleRead()" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" x-text="contextMenu?.email?.is_read ? 'Mark as unread' : 'Mark as read'"></button>
+            <button @click="contextMenuToggleStar()" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" x-text="contextMenu?.email?.is_starred ? 'Unstar' : 'Star'"></button>
+            <hr class="border-gray-200 dark:border-gray-800 my-1">
+            <div class="px-3 py-1 text-xs text-gray-500 font-medium">Snooze for…</div>
+            <button @click="contextMenuSnooze('1h')" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">1 hour</button>
+            <button @click="contextMenuSnooze('3h')" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">3 hours</button>
+            <button @click="contextMenuSnooze('tomorrow')" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">Tomorrow 9am</button>
+            <button @click="contextMenuSnooze('nextweek')" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">Next week</button>
+            <hr class="border-gray-200 dark:border-gray-800 my-1">
+            <div class="px-3 py-1 text-xs text-gray-500 font-medium">Move to…</div>
+            <template x-for="folder in folders" :key="folder.id">
+                <button @click="contextMenuMove(folder.normalized_name)" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" x-text="folder.name"></button>
+            </template>
+            <hr class="border-gray-200 dark:border-gray-800 my-1">
+            <button @click="contextMenuDelete()" class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer">Delete</button>
+        </div>
+
+        <!-- ============ Undo Send Bar ============ -->
+        <div x-cloak x-show="undoSendTimer" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[75] bg-gray-900 dark:bg-gray-800 text-white px-4 py-3 rounded-lg flex items-center gap-3 text-sm shadow-lg">
+            <span>Sending in <span x-text="undoSendSeconds"></span>s…</span>
+            <button @click="undoSend()" class="text-blue-400 font-medium hover:text-blue-300 cursor-pointer">Undo</button>
         </div>
 
         <!-- ============ Toasts ============ -->

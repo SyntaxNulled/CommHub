@@ -32,6 +32,12 @@ async def init_db():
         except Exception:
             pass
 
+        for col in ["snoozed_until", "send_at"]:
+            try:
+                await conn.execute(sqlalchemy.text(f"ALTER TABLE emails ADD COLUMN {col} DATETIME"))
+            except Exception:
+                pass
+
     await _ensure_system_folders()
 
 
