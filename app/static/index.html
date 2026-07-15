@@ -65,6 +65,115 @@
                         <div class="text-center text-gray-400"><div class="text-4xl mb-3">📅</div><p class="text-sm">Calendar coming in Phase 5</p></div>
                     </div>
 
+                    <!-- Automation -->
+                    <div x-show="!loading && page === 'automation'" class="p-6 max-w-4xl">
+
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-lg font-medium text-gray-900">Automation Rules</h3>
+                            <button @click="openNewRule()" class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">+ New Rule</button>
+                        </div>
+
+                        <!-- Rules -->
+                        <div class="space-y-3 mb-8">
+                            <template x-for="rule in automationRules" :key="rule.id">
+                                <div class="border border-gray-200 rounded-lg p-4">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-medium text-gray-900" x-text="rule.name"></span>
+                                                <span class="text-xs px-2 py-0.5 rounded-full"
+                                                      :class="rule.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                                                      x-text="rule.is_enabled ? 'Active' : 'Disabled'"></span>
+                                            </div>
+                                            <div class="text-sm text-gray-500 mt-1" x-show="rule.description" x-text="rule.description"></div>
+                                            <div class="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                                                <span x-html="triggerTypeLabel(rule.trigger_type)"></span>
+                                                <span>→</span>
+                                                <span x-html="actionTypeLabel(rule.action_type)"></span>
+                                                <span x-show="rule.cron_schedule" class="font-mono">· <span x-text="rule.cron_schedule"></span></span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1 shrink-0 ml-4">
+                                            <button @click="toggleRule(rule.id)" class="px-2 py-1 text-xs rounded hover:bg-gray-100"
+                                                    :class="rule.is_enabled ? 'text-yellow-600' : 'text-green-600'"
+                                                    x-text="rule.is_enabled ? 'Disable' : 'Enable'"></button>
+                                            <button @click="editRule(rule)" class="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 rounded hover:bg-gray-100">Edit</button>
+                                            <button @click="deleteRule(rule.id)" class="px-2 py-1 text-xs text-red-500 hover:text-red-700 rounded hover:bg-red-50">Delete</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="automationRules.length === 0" class="bg-gray-50 rounded-lg p-8 text-center text-gray-400 text-sm">No automation rules yet. Create one to get started.</div>
+                        </div>
+
+                        <!-- Rule Form -->
+                        <div x-show="ruleFormOpen" class="border border-gray-200 rounded-lg p-5 bg-gray-50 mb-6">
+                            <h4 class="font-medium text-gray-900 mb-4" x-text="ruleFormEdit ? 'Edit Rule' : 'New Rule'"></h4>
+                            <div class="space-y-3 max-w-lg">
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Name</label>
+                                    <input type="text" x-model="ruleForm.name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Description</label>
+                                    <input type="text" x-model="ruleForm.description" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-sm text-gray-600 mb-1">Trigger</label>
+                                        <select x-model="ruleForm.trigger_type" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                                            <template x-for="t in triggerTypes" :key="t">
+                                                <option :value="t" x-text="t"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-gray-600 mb-1">Action</label>
+                                        <select x-model="ruleForm.action_type" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                                            <template x-for="a in actionTypes" :key="a">
+                                                <option :value="a" x-text="a"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div x-show="ruleForm.trigger_type === 'cron_schedule'">
+                                    <label class="block text-sm text-gray-600 mb-1">Cron Expression <span class="text-gray-400">(e.g. */5 * * * * = every 5 min)</span></label>
+                                    <input type="text" x-model="ruleForm.cron_schedule" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white font-mono" placeholder="*/5 * * * *">
+                                </div>
+                                <div x-show="ruleForm.action_type === 'auto_reply'">
+                                    <label class="block text-sm text-gray-600 mb-1">Auto-Reply Body</label>
+                                    <textarea x-model="ruleForm.action_config.body" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white" placeholder="Thank you for your message..."></textarea>
+                                </div>
+                                <div x-show="ruleForm.action_type === 'forward'">
+                                    <label class="block text-sm text-gray-600 mb-1">Forward To</label>
+                                    <input type="text" x-model="ruleForm.action_config.to" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white" placeholder="forward@example.com">
+                                </div>
+                                <div x-show="ruleForm.action_type === 'categorize'">
+                                    <label class="block text-sm text-gray-600 mb-1">Category</label>
+                                    <input type="text" x-model="ruleForm.action_config.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white" placeholder="work, personal, newsletter...">
+                                </div>
+                                <div class="flex gap-2 pt-2">
+                                    <button @click="saveRule()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Save</button>
+                                    <button @click="closeRuleForm()" class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-100">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Scheduled Jobs -->
+                        <div class="mt-8">
+                            <h4 class="text-sm font-medium text-gray-700 mb-3">Scheduled Cron Jobs</h4>
+                            <div class="space-y-2">
+                                <template x-for="job in scheduledJobs" :key="job.id">
+                                    <div class="text-sm text-gray-500 bg-gray-50 rounded-lg px-4 py-2 flex items-center justify-between">
+                                        <span><span class="font-mono" x-text="job.id"></span> — next run: <span x-text="job.next_run || 'unknown'"></span></span>
+                                        <span class="text-xs text-gray-400" x-text="job.trigger"></span>
+                                    </div>
+                                </template>
+                                <div x-show="scheduledJobs.length === 0" class="text-sm text-gray-400 bg-gray-50 rounded-lg px-4 py-3">No scheduled jobs.</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Settings -->
                     <div x-show="!loading && page === 'settings'" class="p-6 max-w-3xl">
 

@@ -16,6 +16,7 @@ document.addEventListener('alpine:init', () => {
             { id: 'drafts', label: 'Drafts', icon: '📝' },
             { id: 'starred', label: 'Starred', icon: '⭐' },
             { id: 'calendar', label: 'Calendar', icon: '📅' },
+            { id: 'automation', label: 'Automation', icon: '⚡' },
             { id: 'settings', label: 'Settings', icon: '⚙️' },
         ],
 
@@ -59,6 +60,10 @@ document.addEventListener('alpine:init', () => {
             await this.checkHealth();
             await this.loadAiProviders();
             await this.loadAiConfigs();
+            await this.loadTriggerTypes();
+            await this.loadActionTypes();
+            await this.loadAutomationRules();
+            await this.loadScheduledJobs();
             this.loading = false;
         },
 
@@ -75,6 +80,7 @@ document.addEventListener('alpine:init', () => {
             this.page = pageId;
             this.selectedEmail = null;
             if (pageId !== 'settings') this.closeAiForm();
+            if (pageId !== 'automation') this.closeRuleForm();
         },
 
         // --- AI Providers CRUD ---
@@ -220,6 +226,126 @@ document.addEventListener('alpine:init', () => {
 
         copyAiResult() {
             navigator.clipboard?.writeText(this.aiResult);
+        },
+
+        // --- Automation State ---
+        automationRules: [],
+        triggerTypes: [],
+        actionTypes: [],
+        scheduledJobs: [],
+        ruleFormOpen: false,
+        ruleFormEdit: false,
+        ruleForm: {
+            name: '', description: '', trigger_type: 'new_email',
+            trigger_config: {}, action_type: 'auto_reply',
+            action_config: {}, cron_schedule: '', is_enabled: true, account_id: null,
+        },
+
+        async loadAutomationRules() {
+            try {
+                const res = await fetch('/api/automation/rules');
+                if (res.ok) this.automationRules = await res.json();
+            } catch (e) {}
+        },
+
+        async loadTriggerTypes() {
+            try {
+                const res = await fetch('/api/automation/trigger-types');
+                if (res.ok) this.triggerTypes = await res.json();
+            } catch (e) {}
+        },
+
+        async loadActionTypes() {
+            try {
+                const res = await fetch('/api/automation/action-types');
+                if (res.ok) this.actionTypes = await res.json();
+            } catch (e) {}
+        },
+
+        async loadScheduledJobs() {
+            try {
+                const res = await fetch('/api/automation/scheduler/jobs');
+                if (res.ok) this.scheduledJobs = await res.json();
+            } catch (e) {}
+        },
+
+        openNewRule() {
+            this.ruleForm = {
+                name: '', description: '', trigger_type: 'new_email',
+                trigger_config: {}, action_type: 'auto_reply',
+                action_config: {}, cron_schedule: '', is_enabled: true, account_id: null,
+            };
+            this.ruleFormEdit = false;
+            this.ruleFormOpen = true;
+        },
+
+        editRule(rule) {
+            this.ruleForm = {
+                name: rule.name, description: rule.description || '',
+                trigger_type: rule.trigger_type, trigger_config: rule.trigger_config || {},
+                action_type: rule.action_type, action_config: rule.action_config || {},
+                cron_schedule: rule.cron_schedule || '', is_enabled: rule.is_enabled,
+                account_id: rule.account_id,
+            };
+            this.ruleFormEdit = true;
+            this.ruleFormEditId = rule.id;
+            this.ruleFormOpen = true;
+        },
+
+        closeRuleForm() {
+            this.ruleFormOpen = false;
+            this.ruleFormEdit = false;
+            this.ruleFormEditId = null;
+        },
+
+        async saveRule() {
+            try {
+                const payload = { ...this.ruleForm };
+                if (!payload.cron_schedule) payload.cron_schedule = null;
+                const url = this.ruleFormEdit
+                    ? `/api/automation/rules/${this.ruleFormEditId}`
+                    : '/api/automation/rules';
+                const method = this.ruleFormEdit ? 'PUT' : 'POST';
+                const res = await fetch(url, {
+                    method, headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (res.ok) {
+                    this.closeRuleForm();
+                    await this.loadAutomationRules();
+                    await this.loadScheduledJobs();
+                }
+            } catch (e) {}
+        },
+
+        async deleteRule(ruleId) {
+            try {
+                const res = await fetch(`/api/automation/rules/${ruleId}`, { method: 'DELETE' });
+                if (res.ok) {
+                    await this.loadAutomationRules();
+                    await this.loadScheduledJobs();
+                }
+            } catch (e) {}
+        },
+
+        async toggleRule(ruleId) {
+            try {
+                const res = await fetch(`/api/automation/rules/${ruleId}/toggle`, { method: 'POST' });
+                if (res.ok) {
+                    await this.loadAutomationRules();
+                    await this.loadScheduledJobs();
+                }
+            } catch (e) {}
+        },
+
+        triggerTypeLabel(type) {
+            const labels = { new_email: '📩 New Email', keyword_match: '🔑 Keyword Match', cron_schedule: '⏰ Cron Schedule' };
+            return labels[type] || type;
+        },
+
+        actionTypeLabel(type) {
+            const labels = { auto_reply: '✉️ Auto-Reply', categorize: '🏷️ Categorize', mark_read: '✔️ Mark Read', star: '⭐ Star', forward: '📤 Forward' };
+            return labels[type] || type;
         },
 
         formatDate(dateStr) {
