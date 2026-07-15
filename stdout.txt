@@ -301,3 +301,133 @@ WHERE calendar_events.start_time >= ? AND calendar_events.end_time <= ? ORDER BY
 2026-07-15 11:32:21,827 INFO sqlalchemy.engine.Engine [cached since 63.15s ago] ('2026-07-11 14:00:00.000000', '2026-07-19 13:59:59.999000')
 INFO:     127.0.0.1:61615 - "GET /api/calendar/events?start=2026-07-11T14:00:00.000Z&end=2026-07-19T13:59:59.999Z HTTP/1.1" 200 OK
 2026-07-15 11:32:21,838 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:54617 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53051 - "GET /css/style.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54617 - "GET /js/app.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54617 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53051 - "GET /api/health HTTP/1.1" 200 OK
+2026-07-15 13:05:38,958 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:38,962 INFO sqlalchemy.engine.Engine SELECT calendar_events.id, calendar_events.account_id, calendar_events.provider_event_id, calendar_events.title, calendar_events.description, calendar_events.location, calendar_events.start_time, calendar_events.end_time, calendar_events.is_all_day, calendar_events.created_at 
+FROM calendar_events 
+WHERE calendar_events.start_time >= ? AND calendar_events.end_time <= ? ORDER BY calendar_events.start_time
+2026-07-15 13:05:38,963 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ('2026-07-11 14:00:00.000000', '2026-07-19 13:59:59.999000')
+INFO:     127.0.0.1:53051 - "GET /api/calendar/events?start=2026-07-11T14:00:00.000Z&end=2026-07-19T13:59:59.999Z HTTP/1.1" 200 OK
+2026-07-15 13:05:38,973 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-07-15 13:05:39,017 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:39,019 INFO sqlalchemy.engine.Engine SELECT ai_provider_configs.id, ai_provider_configs.provider_type, ai_provider_configs.display_name, ai_provider_configs.api_key, ai_provider_configs.base_url, ai_provider_configs.model, ai_provider_configs.is_active, ai_provider_configs.temperature, ai_provider_configs.max_tokens, ai_provider_configs.extra_params, ai_provider_configs.created_at, ai_provider_configs.updated_at 
+FROM ai_provider_configs
+2026-07-15 13:05:39,019 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ()
+INFO:     127.0.0.1:53051 - "GET /api/ai/configs HTTP/1.1" 200 OK
+2026-07-15 13:05:39,023 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-07-15 13:05:39,028 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:39,029 INFO sqlalchemy.engine.Engine SELECT ai_provider_configs.id, ai_provider_configs.provider_type, ai_provider_configs.display_name, ai_provider_configs.api_key, ai_provider_configs.base_url, ai_provider_configs.model, ai_provider_configs.is_active, ai_provider_configs.temperature, ai_provider_configs.max_tokens, ai_provider_configs.extra_params, ai_provider_configs.created_at, ai_provider_configs.updated_at 
+FROM ai_provider_configs
+2026-07-15 13:05:39,030 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ()
+INFO:     127.0.0.1:54617 - "GET /api/ai/configs HTTP/1.1" 200 OK
+2026-07-15 13:05:39,034 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:54617 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52434 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53051 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+2026-07-15 13:05:39,095 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:39,097 INFO sqlalchemy.engine.Engine SELECT emails.id, emails.account_id, emails.provider_message_id, emails.thread_id, emails.from_address, emails.from_name, emails.to_addresses, emails.cc_addresses, emails.bcc_addresses, emails.subject, emails.body_text, emails.body_html, emails.is_read, emails.is_starred, emails.folder, emails.received_at, emails.created_at 
+FROM emails 
+WHERE emails.folder = ? ORDER BY emails.received_at DESC
+2026-07-15 13:05:39,097 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ('INBOX',)
+2026-07-15 13:05:39,101 INFO sqlalchemy.engine.Engine SELECT email_accounts.id, email_accounts.email, email_accounts.provider, email_accounts.display_name, email_accounts.is_active, email_accounts.oauth_token_json, email_accounts.created_at, email_accounts.updated_at 
+FROM email_accounts
+2026-07-15 13:05:39,102 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ()
+INFO:     127.0.0.1:53051 - "GET /api/emails?folder=INBOX HTTP/1.1" 200 OK
+2026-07-15 13:05:39,106 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-07-15 13:05:39,108 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:39,109 INFO sqlalchemy.engine.Engine SELECT emails.id, emails.account_id, emails.provider_message_id, emails.thread_id, emails.from_address, emails.from_name, emails.to_addresses, emails.cc_addresses, emails.bcc_addresses, emails.subject, emails.body_text, emails.body_html, emails.is_read, emails.is_starred, emails.folder, emails.received_at, emails.created_at 
+FROM emails 
+WHERE emails.folder = ? ORDER BY emails.received_at DESC
+2026-07-15 13:05:39,109 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ('INBOX',)
+2026-07-15 13:05:39,113 INFO sqlalchemy.engine.Engine SELECT email_accounts.id, email_accounts.email, email_accounts.provider, email_accounts.display_name, email_accounts.is_active, email_accounts.oauth_token_json, email_accounts.created_at, email_accounts.updated_at 
+FROM email_accounts
+2026-07-15 13:05:39,114 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ()
+INFO:     127.0.0.1:52434 - "GET /api/emails?folder=INBOX HTTP/1.1" 200 OK
+2026-07-15 13:05:39,117 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:52434 - "GET /api/ai/providers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52434 - "GET /api/ai/providers HTTP/1.1" 200 OK
+2026-07-15 13:05:39,161 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:39,162 INFO sqlalchemy.engine.Engine SELECT ai_provider_configs.id, ai_provider_configs.provider_type, ai_provider_configs.display_name, ai_provider_configs.api_key, ai_provider_configs.base_url, ai_provider_configs.model, ai_provider_configs.is_active, ai_provider_configs.temperature, ai_provider_configs.max_tokens, ai_provider_configs.extra_params, ai_provider_configs.created_at, ai_provider_configs.updated_at 
+FROM ai_provider_configs
+2026-07-15 13:05:39,162 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ()
+INFO:     127.0.0.1:52434 - "GET /api/ai/configs HTTP/1.1" 200 OK
+2026-07-15 13:05:39,166 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-07-15 13:05:39,180 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:39,181 INFO sqlalchemy.engine.Engine SELECT ai_provider_configs.id, ai_provider_configs.provider_type, ai_provider_configs.display_name, ai_provider_configs.api_key, ai_provider_configs.base_url, ai_provider_configs.model, ai_provider_configs.is_active, ai_provider_configs.temperature, ai_provider_configs.max_tokens, ai_provider_configs.extra_params, ai_provider_configs.created_at, ai_provider_configs.updated_at 
+FROM ai_provider_configs
+2026-07-15 13:05:39,182 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ()
+INFO:     127.0.0.1:53051 - "GET /api/automation/trigger-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52434 - "GET /api/ai/configs HTTP/1.1" 200 OK
+2026-07-15 13:05:39,188 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:52434 - "GET /api/automation/action-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53051 - "GET /api/automation/trigger-types HTTP/1.1" 200 OK
+2026-07-15 13:05:39,198 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:39,199 INFO sqlalchemy.engine.Engine SELECT automation_rules.id, automation_rules.name, automation_rules.description, automation_rules.account_id, automation_rules.is_enabled, automation_rules.trigger_type, automation_rules.trigger_config, automation_rules.action_type, automation_rules.action_config, automation_rules.cron_schedule, automation_rules.created_at 
+FROM automation_rules ORDER BY automation_rules.created_at DESC
+2026-07-15 13:05:39,199 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ()
+INFO:     127.0.0.1:52434 - "GET /api/automation/action-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53051 - "GET /api/automation/rules HTTP/1.1" 200 OK
+2026-07-15 13:05:39,203 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-07-15 13:05:39,205 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:39,206 INFO sqlalchemy.engine.Engine SELECT automation_rules.id, automation_rules.name, automation_rules.description, automation_rules.account_id, automation_rules.is_enabled, automation_rules.trigger_type, automation_rules.trigger_config, automation_rules.action_type, automation_rules.action_config, automation_rules.cron_schedule, automation_rules.created_at 
+FROM automation_rules ORDER BY automation_rules.created_at DESC
+2026-07-15 13:05:39,207 INFO sqlalchemy.engine.Engine [cached since 5660s ago] ()
+INFO:     127.0.0.1:53051 - "GET /api/automation/scheduler/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52434 - "GET /api/automation/rules HTTP/1.1" 200 OK
+2026-07-15 13:05:39,211 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:52434 - "GET /api/automation/scheduler/jobs HTTP/1.1" 200 OK
+2026-07-15 13:05:47,774 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:47,776 INFO sqlalchemy.engine.Engine SELECT emails.id, emails.account_id, emails.provider_message_id, emails.thread_id, emails.from_address, emails.from_name, emails.to_addresses, emails.cc_addresses, emails.bcc_addresses, emails.subject, emails.body_text, emails.body_html, emails.is_read, emails.is_starred, emails.folder, emails.received_at, emails.created_at 
+FROM emails 
+WHERE emails.folder = ? ORDER BY emails.received_at DESC
+2026-07-15 13:05:47,777 INFO sqlalchemy.engine.Engine [cached since 5669s ago] ('INBOX',)
+2026-07-15 13:05:47,782 INFO sqlalchemy.engine.Engine SELECT email_accounts.id, email_accounts.email, email_accounts.provider, email_accounts.display_name, email_accounts.is_active, email_accounts.oauth_token_json, email_accounts.created_at, email_accounts.updated_at 
+FROM email_accounts
+2026-07-15 13:05:47,782 INFO sqlalchemy.engine.Engine [cached since 5669s ago] ()
+INFO:     127.0.0.1:59562 - "GET /api/emails?folder=INBOX HTTP/1.1" 200 OK
+2026-07-15 13:05:47,788 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-07-15 13:05:50,801 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:50,803 INFO sqlalchemy.engine.Engine SELECT emails.id, emails.account_id, emails.provider_message_id, emails.thread_id, emails.from_address, emails.from_name, emails.to_addresses, emails.cc_addresses, emails.bcc_addresses, emails.subject, emails.body_text, emails.body_html, emails.is_read, emails.is_starred, emails.folder, emails.received_at, emails.created_at 
+FROM emails 
+WHERE emails.id = ?
+2026-07-15 13:05:50,805 INFO sqlalchemy.engine.Engine [cached since 5668s ago] (17,)
+2026-07-15 13:05:50,817 INFO sqlalchemy.engine.Engine UPDATE emails SET is_read=? WHERE emails.id = ?
+2026-07-15 13:05:50,819 INFO sqlalchemy.engine.Engine [cached since 5668s ago] (1, 17)
+2026-07-15 13:05:50,826 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:59562 - "GET /api/emails/17 HTTP/1.1" 200 OK
+2026-07-15 13:05:51,353 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:51,355 INFO sqlalchemy.engine.Engine SELECT emails.id, emails.account_id, emails.provider_message_id, emails.thread_id, emails.from_address, emails.from_name, emails.to_addresses, emails.cc_addresses, emails.bcc_addresses, emails.subject, emails.body_text, emails.body_html, emails.is_read, emails.is_starred, emails.folder, emails.received_at, emails.created_at 
+FROM emails 
+WHERE emails.id = ?
+2026-07-15 13:05:51,356 INFO sqlalchemy.engine.Engine [cached since 5668s ago] (5,)
+2026-07-15 13:05:51,359 INFO sqlalchemy.engine.Engine UPDATE emails SET is_read=? WHERE emails.id = ?
+2026-07-15 13:05:51,360 INFO sqlalchemy.engine.Engine [cached since 5668s ago] (1, 5)
+2026-07-15 13:05:51,365 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:59562 - "GET /api/emails/5 HTTP/1.1" 200 OK
+2026-07-15 13:05:52,114 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:52,118 INFO sqlalchemy.engine.Engine SELECT emails.id, emails.account_id, emails.provider_message_id, emails.thread_id, emails.from_address, emails.from_name, emails.to_addresses, emails.cc_addresses, emails.bcc_addresses, emails.subject, emails.body_text, emails.body_html, emails.is_read, emails.is_starred, emails.folder, emails.received_at, emails.created_at 
+FROM emails 
+WHERE emails.id = ?
+2026-07-15 13:05:52,119 INFO sqlalchemy.engine.Engine [cached since 5669s ago] (18,)
+2026-07-15 13:05:52,123 INFO sqlalchemy.engine.Engine UPDATE emails SET is_read=? WHERE emails.id = ?
+2026-07-15 13:05:52,124 INFO sqlalchemy.engine.Engine [cached since 5669s ago] (1, 18)
+2026-07-15 13:05:52,127 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:59562 - "GET /api/emails/18 HTTP/1.1" 200 OK
+2026-07-15 13:05:57,763 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:57,765 INFO sqlalchemy.engine.Engine SELECT calendar_events.id, calendar_events.account_id, calendar_events.provider_event_id, calendar_events.title, calendar_events.description, calendar_events.location, calendar_events.start_time, calendar_events.end_time, calendar_events.is_all_day, calendar_events.created_at 
+FROM calendar_events 
+WHERE calendar_events.start_time >= ? AND calendar_events.end_time <= ? ORDER BY calendar_events.start_time
+2026-07-15 13:05:57,766 INFO sqlalchemy.engine.Engine [cached since 5679s ago] ('2026-07-11 14:00:00.000000', '2026-07-19 13:59:59.999000')
+INFO:     127.0.0.1:63612 - "GET /api/calendar/events?start=2026-07-11T14:00:00.000Z&end=2026-07-19T13:59:59.999Z HTTP/1.1" 200 OK
+2026-07-15 13:05:57,773 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-07-15 13:05:57,777 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-07-15 13:05:57,778 INFO sqlalchemy.engine.Engine SELECT calendar_events.id, calendar_events.account_id, calendar_events.provider_event_id, calendar_events.title, calendar_events.description, calendar_events.location, calendar_events.start_time, calendar_events.end_time, calendar_events.is_all_day, calendar_events.created_at 
+FROM calendar_events 
+WHERE calendar_events.start_time >= ? AND calendar_events.end_time <= ? ORDER BY calendar_events.start_time
+2026-07-15 13:05:57,779 INFO sqlalchemy.engine.Engine [cached since 5679s ago] ('2026-07-11 14:00:00.000000', '2026-07-19 13:59:59.999000')
+INFO:     127.0.0.1:59715 - "GET /api/calendar/events?start=2026-07-11T14:00:00.000Z&end=2026-07-19T13:59:59.999Z HTTP/1.1" 200 OK
+2026-07-15 13:05:57,787 INFO sqlalchemy.engine.Engine ROLLBACK
