@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import Email, EmailAccount
@@ -53,6 +53,9 @@ def _email_to_response(e: Email, account_email: str = "") -> EmailResponse:
 async def list_emails(
     folder: str = Query("INBOX"),
     account_id: int | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    response: Response = None,
     db: AsyncSession = Depends(get_db),
 ):
     q = select(Email)
@@ -63,8 +66,11 @@ async def list_emails(
             q = q.where(Email.folder == folder.upper())
     if account_id:
         q = q.where(Email.account_id == account_id)
-    q = q.order_by(desc(Email.received_at))
 
+    count_q = select(func.count()).select_from(q.subquery())
+    total = (await db.execute(count_q)).scalar() or 0
+
+    q = q.order_by(desc(Email.received_at)).offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(q)
     emails = result.scalars().all()
 
@@ -73,6 +79,11 @@ async def list_emails(
         acc_result = await db.execute(select(EmailAccount))
         for a in acc_result.scalars().all():
             accounts[a.id] = a.email
+
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Page"] = str(page)
+        response.headers["X-Page-Size"] = str(page_size)
 
     return [_email_to_response(e, accounts.get(e.account_id, "")) for e in emails]
 

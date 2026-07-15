@@ -1,6 +1,7 @@
-"""CommHub launcher — starts the server and opens the browser."""
+"""CommHub launcher — starts the server, opens the browser, and sets up system tray."""
 
 import sys
+import signal
 import webbrowser
 import uvicorn
 from pathlib import Path
@@ -18,6 +19,13 @@ def main():
     print(f"  == CommHub v{settings.app_version} ==")
     print(f"  Opening {url}")
     webbrowser.open(url)
+
+    try:
+        from app.tray import start_tray
+        start_tray(url, on_quit=lambda: signal.raise_signal(signal.SIGINT))
+    except ImportError:
+        pass
+
     uvicorn.run(
         app,
         host=settings.host,
